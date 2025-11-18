@@ -9,12 +9,13 @@ Defines the interface for:
 - Message types and structures
 - Service definitions for room management, message forwarding, and coordination
 
-## Generating Go Code
+## Generating Python Code
 
-After defining .proto files, generate Go code with:
+After defining .proto files, generate Python code with:
 
 ```bash
-protoc --go_out=. --go_opt=paths=source_relative \
-    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+python -m grpc_tools.protoc -I. \
+    --python_out=. \
+    --grpc_python_out=. \
     proto/*.proto
 ```

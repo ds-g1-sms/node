@@ -1,7 +1,17 @@
-# Ignore build artifacts
-bin/
-build/
+# Ignore Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
 dist/
+build/
+bin/
+
+# Ignore virtual environments
+venv/
+env/
+ENV/
+.venv/
 
 # Ignore git files
 .git
@@ -22,7 +32,9 @@ tmp/
 *.log
 
 # Ignore test files
-*.test
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Ignore documentation
 docs/

@@ -1,6 +1,6 @@
 # Distributed Chat System - Node
 
-A distributed peer-to-peer chat system built with Go, gRPC, and WebSockets.
+A distributed peer-to-peer chat system built with Python, gRPC, and WebSockets.
 
 ## Overview
 
@@ -45,7 +45,8 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Python 3.8 or later
+- Poetry - Python package manager
 - Protocol Buffers compiler (protoc) - for code generation
 - Make - for using Makefile targets
 - Docker & Docker Compose - for containerized deployment (optional)
@@ -56,11 +57,8 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 # View all available targets
 make help
 
-# Download dependencies
+# Install dependencies
 make deps
-
-# Build binaries
-make build
 
 # Run node server in development mode
 make dev-node
@@ -69,25 +67,24 @@ make dev-node
 make dev-client
 ```
 
-### Building
+### Installing
 
 ```bash
 # Using Make (recommended)
-make build
+make install
 
-# Or using Go directly
-go build -o bin/node ./cmd/node
-go build -o bin/client ./cmd/client
+# Or using Poetry directly
+poetry install
 ```
 
 ### Running
 
 ```bash
 # Start a node server
-./bin/node
+poetry run python -m src.node.main
 
 # Start a client
-./bin/client
+poetry run python -m src.client.main
 ```
 
 ## Development
@@ -95,7 +92,7 @@ go build -o bin/client ./cmd/client
 ### Dependency Management
 
 ```bash
-# Download dependencies
+# Install dependencies
 make deps
 
 # Update dependencies to latest versions
@@ -104,15 +101,16 @@ make deps-update
 
 ### Code Generation
 
-Generate Go code from Protocol Buffer definitions:
+Generate Python code from Protocol Buffer definitions:
 
 ```bash
 # Using Make
 make proto
 
-# Or using protoc directly
-protoc --go_out=. --go_opt=paths=source_relative \
-    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+# Or using Poetry and protoc directly
+poetry run python -m grpc_tools.protoc -I. \
+    --python_out=. \
+    --grpc_python_out=. \
     proto/*.proto
 ```
 
@@ -122,8 +120,8 @@ protoc --go_out=. --go_opt=paths=source_relative \
 # Using Make
 make test
 
-# Or using Go directly
-go test ./...
+# Or using Poetry directly
+poetry run pytest -v
 ```
 
 ### Linting
@@ -151,11 +149,13 @@ make docker-down
 make docker-clean
 ```
 
+**Note**: Docker builds use a `requirements.txt` file generated from `pyproject.toml`. If you update dependencies in `pyproject.toml`, update `requirements.txt` accordingly for Docker builds.
+
 For more details on Docker deployment, see [deploy/README.md](deploy/README.md).
 
 ## Technology Stack
 
-- **Language**: Go
+- **Language**: Python
 - **Server-to-Server**: gRPC with Protocol Buffers
 - **Client-to-Server**: WebSockets
 - **State Management**: In-memory (with optional CockroachDB for persistence)
