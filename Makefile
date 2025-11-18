@@ -1,4 +1,4 @@
-.PHONY: all install clean test lint proto help deps deps-update dev-node dev-client docker-build docker-up docker-down docker-clean
+.PHONY: all install clean test lint format proto help deps deps-update dev-node dev-client docker-build docker-up docker-down docker-clean
 
 # Default target
 all: install
@@ -10,6 +10,7 @@ help:
 	@echo "  clean         - Remove build artifacts"
 	@echo "  test          - Run tests"
 	@echo "  lint          - Run linters"
+	@echo "  format        - Format code with black"
 	@echo "  proto         - Generate code from proto files"
 	@echo "  deps          - Install dependencies"
 	@echo "  deps-update   - Update dependencies to latest versions"
@@ -47,6 +48,12 @@ lint:
 	@poetry run flake8 src/ || true
 	@poetry run pylint src/ || true
 	@echo "Lint complete!"
+
+## format: Format code with black
+format:
+	@echo "Formatting code with black..."
+	@poetry run black src/
+	@echo "Format complete!"
 
 ## proto: Generate Python code from proto files
 proto:
