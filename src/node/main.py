@@ -10,8 +10,7 @@ import sys
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +33,7 @@ def main():
     try:
         # Block forever (until interrupted)
         import threading
+
         threading.Event().wait()
     except KeyboardInterrupt:
         logger.info("Shutting down node server...")

@@ -37,12 +37,16 @@ jobs:
     - name: Install dependencies
       run: poetry install
     
+    - name: Check code formatting with black
+      run: poetry run black --check src/
+      continue-on-error: false
+    
     - name: Run flake8
       run: poetry run flake8 src/
       continue-on-error: false
     
     - name: Run pylint
-      run: poetry run pylint src/
+      run: poetry run pylint src/ --fail-under=8.0
       continue-on-error: false
     
     - name: Run tests
