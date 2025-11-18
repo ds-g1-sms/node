@@ -46,16 +46,37 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 ### Prerequisites
 
 - Go 1.21 or later
-- Protocol Buffers compiler (protoc)
-- Make (optional)
+- Protocol Buffers compiler (protoc) - for code generation
+- Make - for using Makefile targets
+- Docker & Docker Compose - for containerized deployment (optional)
+
+### Quick Start with Make
+
+```bash
+# View all available targets
+make help
+
+# Download dependencies
+make deps
+
+# Build binaries
+make build
+
+# Run node server in development mode
+make dev-node
+
+# Run client in development mode (in another terminal)
+make dev-client
+```
 
 ### Building
 
 ```bash
-# Build node server
-go build -o bin/node ./cmd/node
+# Using Make (recommended)
+make build
 
-# Build client
+# Or using Go directly
+go build -o bin/node ./cmd/node
 go build -o bin/client ./cmd/client
 ```
 
@@ -71,11 +92,25 @@ go build -o bin/client ./cmd/client
 
 ## Development
 
+### Dependency Management
+
+```bash
+# Download dependencies
+make deps
+
+# Update dependencies to latest versions
+make deps-update
+```
+
 ### Code Generation
 
 Generate Go code from Protocol Buffer definitions:
 
 ```bash
+# Using Make
+make proto
+
+# Or using protoc directly
 protoc --go_out=. --go_opt=paths=source_relative \
     --go-grpc_out=. --go-grpc_opt=paths=source_relative \
     proto/*.proto
@@ -84,8 +119,39 @@ protoc --go_out=. --go_opt=paths=source_relative \
 ### Testing
 
 ```bash
+# Using Make
+make test
+
+# Or using Go directly
 go test ./...
 ```
+
+### Linting
+
+```bash
+make lint
+```
+
+### Docker Development
+
+```bash
+# Build Docker images
+make docker-build
+
+# Start all containers (3 nodes + 1 client)
+make docker-up
+
+# View logs
+docker compose logs -f
+
+# Stop containers
+make docker-down
+
+# Clean up (remove containers, volumes, and images)
+make docker-clean
+```
+
+For more details on Docker deployment, see [deploy/README.md](deploy/README.md).
 
 ## Technology Stack
 
