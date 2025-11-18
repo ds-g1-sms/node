@@ -1,17 +1,17 @@
-.PHONY: all build clean test lint proto help deps deps-update dev-node dev-client docker-build docker-up docker-down docker-clean
+.PHONY: all install clean test lint proto help deps deps-update dev-node dev-client docker-build docker-up docker-down docker-clean
 
 # Default target
-all: build
+all: install
 
 ## help: Display this help message
 help:
 	@echo "Available targets:"
-	@echo "  build         - Build node server and client"
+	@echo "  install       - Install Python package and dependencies"
 	@echo "  clean         - Remove build artifacts"
 	@echo "  test          - Run tests"
 	@echo "  lint          - Run linters"
 	@echo "  proto         - Generate code from proto files"
-	@echo "  deps          - Download dependencies"
+	@echo "  deps          - Install dependencies"
 	@echo "  deps-update   - Update dependencies to latest versions"
 	@echo "  dev-node      - Run node server in development mode"
 	@echo "  dev-client    - Run client in development mode"
@@ -21,64 +21,62 @@ help:
 	@echo "  docker-clean  - Remove Docker containers and images"
 	@echo "  help          - Display this help message"
 
-## build: Build node server and client binaries
-build:
-	@echo "Building node server..."
-	@go build -o bin/node ./cmd/node
-	@echo "Building client..."
-	@go build -o bin/client ./cmd/client
-	@echo "Build complete!"
+## install: Install Python package and dependencies
+install:
+	@echo "Installing dependencies..."
+	@pip install -r requirements.txt
+	@echo "Installation complete!"
 
 ## clean: Remove build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -rf bin/
-	@go clean
+	@rm -rf build/ dist/ *.egg-info/
+	@find . -type d -name __pycache__ -exec rm -rf {} +
+	@find . -type f -name "*.pyc" -delete
 	@echo "Clean complete!"
 
 ## test: Run all tests
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	@python -m pytest -v
 
 ## lint: Run linters
 lint:
 	@echo "Running linters..."
-	@go fmt ./...
-	@go vet ./...
+	@python -m flake8 src/ || true
+	@python -m pylint src/ || true
 	@echo "Lint complete!"
 
-## proto: Generate Go code from proto files
+## proto: Generate Python code from proto files
 proto:
 	@echo "Generating protobuf code..."
-	@protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+	@python -m grpc_tools.protoc -I. \
+		--python_out=. \
+		--grpc_python_out=. \
 		proto/*.proto
 	@echo "Proto generation complete!"
 
-## deps: Download dependencies
+## deps: Install dependencies
 deps:
-	@echo "Downloading dependencies..."
-	@go mod download
-	@go mod tidy
-	@echo "Dependencies downloaded!"
+	@echo "Installing dependencies..."
+	@pip install -r requirements.txt
+	@echo "Dependencies installed!"
 
 ## deps-update: Update dependencies to latest versions
 deps-update:
 	@echo "Updating dependencies..."
-	@go get -u ./...
-	@go mod tidy
+	@pip install --upgrade -r requirements.txt
 	@echo "Dependencies updated!"
 
 ## dev-node: Run node server in development mode
-dev-node: build
+dev-node:
 	@echo "Starting node server in development mode..."
-	@./bin/node
+	@python -m src.node.main
 
 ## dev-client: Run client in development mode
-dev-client: build
+dev-client:
 	@echo "Starting client in development mode..."
-	@./bin/client
+	@python -m src.client.main
 
 ## docker-build: Build Docker images
 docker-build:

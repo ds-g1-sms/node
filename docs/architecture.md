@@ -327,7 +327,7 @@ mind so features can be added just before demo if time allows.
 
 **Tech Stack**:
 
-- **Language**: Go (systems programming, excellent concurrency support)
+- **Language**: Python (easy to develop, excellent library support)
 - **Server-to-Server**: gRPC with Protocol Buffers
 - **Database**: CockroachDB (optional, for future persistence)
 - **Coordination**: Custom two-phase commit implementation

@@ -1,21 +1,29 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 *.so
-*.dylib
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# Dependency directories (remove the comment below to include it)
-vendor/
-
-# Go workspace file
-go.work
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
 
 # Build output
 /bin/
@@ -43,5 +51,5 @@ go.work
 *.log
 
 # Generated protobuf files (uncomment if you want to ignore them)
-# *.pb.go
-# *_grpc.pb.go
+# *_pb2.py
+# *_pb2_grpc.py

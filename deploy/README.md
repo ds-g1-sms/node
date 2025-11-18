@@ -51,9 +51,6 @@ make docker-clean
 # Install dependencies
 make deps
 
-# Build binaries
-make build
-
 # Run node server
 make dev-node
 
