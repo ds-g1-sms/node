@@ -4,7 +4,7 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Copy requirements file
+# Copy requirements file (generated from Poetry for Docker builds)
 COPY requirements.txt .
 
 # Install dependencies (with trusted host as fallback for SSL issues)

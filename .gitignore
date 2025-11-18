@@ -25,6 +25,9 @@ env/
 ENV/
 .venv/
 
+# Poetry
+poetry.lock
+
 # Build output
 /bin/
 /build/

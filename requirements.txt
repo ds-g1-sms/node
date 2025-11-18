@@ -1,12 +1,12 @@
-# Distributed Chat System - Python Dependencies
+# Generated from pyproject.toml for Docker builds
+# This project uses Poetry for dependency management.
+# Local development: use `poetry install`
+# Docker builds: use this requirements.txt file
+#
+# If you update dependencies in pyproject.toml, regenerate this file:
+# poetry export -f requirements.txt --output requirements.txt --without-hashes --only main
 
-# gRPC and Protocol Buffers
 grpcio>=1.60.0
 grpcio-tools>=1.60.0
 protobuf>=4.25.0
-
-# WebSocket support
 websockets>=12.0
-
-# Async support (if needed)
-asyncio>=3.4.3

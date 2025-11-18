@@ -46,7 +46,7 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 ### Prerequisites
 
 - Python 3.8 or later
-- pip - Python package manager
+- Poetry - Python package manager
 - Protocol Buffers compiler (protoc) - for code generation
 - Make - for using Makefile targets
 - Docker & Docker Compose - for containerized deployment (optional)
@@ -73,18 +73,18 @@ make dev-client
 # Using Make (recommended)
 make install
 
-# Or using pip directly
-pip install -r requirements.txt
+# Or using Poetry directly
+poetry install
 ```
 
 ### Running
 
 ```bash
 # Start a node server
-python -m src.node.main
+poetry run python -m src.node.main
 
 # Start a client
-python -m src.client.main
+poetry run python -m src.client.main
 ```
 
 ## Development
@@ -107,8 +107,8 @@ Generate Python code from Protocol Buffer definitions:
 # Using Make
 make proto
 
-# Or using protoc directly
-python -m grpc_tools.protoc -I. \
+# Or using Poetry and protoc directly
+poetry run python -m grpc_tools.protoc -I. \
     --python_out=. \
     --grpc_python_out=. \
     proto/*.proto
@@ -120,8 +120,8 @@ python -m grpc_tools.protoc -I. \
 # Using Make
 make test
 
-# Or using pytest directly
-python -m pytest -v
+# Or using Poetry directly
+poetry run pytest -v
 ```
 
 ### Linting
@@ -148,6 +148,8 @@ make docker-down
 # Clean up (remove containers, volumes, and images)
 make docker-clean
 ```
+
+**Note**: Docker builds use a `requirements.txt` file generated from `pyproject.toml`. If you update dependencies in `pyproject.toml`, update `requirements.txt` accordingly for Docker builds.
 
 For more details on Docker deployment, see [deploy/README.md](deploy/README.md).
 

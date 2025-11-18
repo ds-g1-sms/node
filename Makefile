@@ -23,8 +23,8 @@ help:
 
 ## install: Install Python package and dependencies
 install:
-	@echo "Installing dependencies..."
-	@pip install -r requirements.txt
+	@echo "Installing dependencies with Poetry..."
+	@poetry install
 	@echo "Installation complete!"
 
 ## clean: Remove build artifacts
@@ -33,24 +33,25 @@ clean:
 	@rm -rf build/ dist/ *.egg-info/
 	@find . -type d -name __pycache__ -exec rm -rf {} +
 	@find . -type f -name "*.pyc" -delete
+	@poetry env remove --all 2>/dev/null || true
 	@echo "Clean complete!"
 
 ## test: Run all tests
 test:
 	@echo "Running tests..."
-	@python -m pytest -v
+	@poetry run pytest -v
 
 ## lint: Run linters
 lint:
 	@echo "Running linters..."
-	@python -m flake8 src/ || true
-	@python -m pylint src/ || true
+	@poetry run flake8 src/ || true
+	@poetry run pylint src/ || true
 	@echo "Lint complete!"
 
 ## proto: Generate Python code from proto files
 proto:
 	@echo "Generating protobuf code..."
-	@python -m grpc_tools.protoc -I. \
+	@poetry run python -m grpc_tools.protoc -I. \
 		--python_out=. \
 		--grpc_python_out=. \
 		proto/*.proto
@@ -58,25 +59,25 @@ proto:
 
 ## deps: Install dependencies
 deps:
-	@echo "Installing dependencies..."
-	@pip install -r requirements.txt
+	@echo "Installing dependencies with Poetry..."
+	@poetry install
 	@echo "Dependencies installed!"
 
 ## deps-update: Update dependencies to latest versions
 deps-update:
 	@echo "Updating dependencies..."
-	@pip install --upgrade -r requirements.txt
+	@poetry update
 	@echo "Dependencies updated!"
 
 ## dev-node: Run node server in development mode
 dev-node:
 	@echo "Starting node server in development mode..."
-	@python -m src.node.main
+	@poetry run python -m src.node.main
 
 ## dev-client: Run client in development mode
 dev-client:
 	@echo "Starting client in development mode..."
-	@python -m src.client.main
+	@poetry run python -m src.client.main
 
 ## docker-build: Build Docker images
 docker-build:
