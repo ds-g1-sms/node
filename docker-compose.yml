@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # Node 1
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: chat-node1
+    ports:
+      - "8081:8080"
+      - "9091:9090"
+    networks:
+      - chat-network
+    environment:
+      - NODE_ID=node1
+      - GRPC_PORT=9090
+      - WEBSOCKET_PORT=8080
+    restart: unless-stopped
+
+  # Node 2
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: chat-node2
+    ports:
+      - "8082:8080"
+      - "9092:9090"
+    networks:
+      - chat-network
+    environment:
+      - NODE_ID=node2
+      - GRPC_PORT=9090
+      - WEBSOCKET_PORT=8080
+    restart: unless-stopped
+
+  # Node 3
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: chat-node3
+    ports:
+      - "8083:8080"
+      - "9093:9090"
+    networks:
+      - chat-network
+    environment:
+      - NODE_ID=node3
+      - GRPC_PORT=9090
+      - WEBSOCKET_PORT=8080
+    restart: unless-stopped
+
+  # Client
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: chat-client
+    stdin_open: true
+    tty: true
+    networks:
+      - chat-network
+    environment:
+      - NODE_URL=ws://node1:8080
+    depends_on:
+      - node1
+      - node2
+      - node3
+    restart: unless-stopped
+
+networks:
+  chat-network:
+    driver: bridge
