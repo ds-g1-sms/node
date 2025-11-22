@@ -8,9 +8,6 @@ packages = [{include = "node", from = "src"}, {include = "client", from = "src"}
 
 [tool.poetry.dependencies]
 python = "^3.8.1"
-grpcio = "^1.60.0"
-grpcio-tools = "^1.60.0"
-protobuf = "^4.25.0"
 websockets = "^12.0"
 
 [tool.poetry.group.dev.dependencies]
