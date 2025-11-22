@@ -6,7 +6,4 @@
 # If you update dependencies in pyproject.toml, regenerate this file:
 # poetry export -f requirements.txt --output requirements.txt --without-hashes --only main
 
-grpcio>=1.60.0
-grpcio-tools>=1.60.0
-protobuf>=4.25.0
 websockets>=12.0

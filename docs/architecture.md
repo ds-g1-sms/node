@@ -194,8 +194,8 @@ simpler.
 
 ### Inter-Node Communication (Server-to-Server)
 
-- **gRPC**: For structured server-to-server communication
-- **Protocol Buffers**: Efficient serialization
+- **XML-RPC**: For structured server-to-server communication using Python's native library
+- **XML Serialization**: Standard XML-based serialization
 - Focus area for the course requirements
 - Handles: room discovery, message forwarding, coordination
 
@@ -240,7 +240,7 @@ simpler.
 │  │  - CockroachDB (for chat history)                    │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────┬───────────────────────────────────────────┘
-                  │ gRPC (Server-to-Server Communication)
+                  │ XML-RPC (Server-to-Server Communication)
          ┌────────┴────────┬────────────────┐
          │                 │                │
     ┌────┴─────┐      ┌────┴─────┐     ┌────┴─────┐
@@ -328,7 +328,7 @@ mind so features can be added just before demo if time allows.
 **Tech Stack**:
 
 - **Language**: Python (easy to develop, excellent library support)
-- **Server-to-Server**: gRPC with Protocol Buffers
+- **Server-to-Server**: XML-RPC (Python's native XML-RPC library)
 - **Database**: CockroachDB (optional, for future persistence)
 - **Coordination**: Custom two-phase commit implementation
 - **Consensus**: etcd (optional, if time permits for advanced features)
