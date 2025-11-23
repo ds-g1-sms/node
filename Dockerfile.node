@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt || \
 # Copy source code
 COPY src/ ./src/
 
-# Expose ports (gRPC and WebSocket)
+# Expose ports (XML-RPC and WebSocket)
 EXPOSE 8080 9090
 
 # Run the node server

@@ -22,7 +22,7 @@ def main():
     logger.info("Starting distributed chat node server...")
 
     # TODO: Initialize server components
-    # - gRPC server for inter-node communication
+    # - XML-RPC server for inter-node communication
     # - WebSocket server for client connections
     # - State management
     # - Room management

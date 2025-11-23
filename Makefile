@@ -1,4 +1,4 @@
-.PHONY: all install clean test lint format proto help deps deps-update dev-node dev-client docker-build docker-up docker-down docker-clean
+.PHONY: all install clean test lint format help deps deps-update dev-node dev-client docker-build docker-up docker-down docker-clean
 
 # Default target
 all: install
@@ -11,7 +11,6 @@ help:
 	@echo "  test          - Run tests"
 	@echo "  lint          - Run linters"
 	@echo "  format        - Format code with black"
-	@echo "  proto         - Generate code from proto files"
 	@echo "  deps          - Install dependencies"
 	@echo "  deps-update   - Update dependencies to latest versions"
 	@echo "  dev-node      - Run node server in development mode"
@@ -54,15 +53,6 @@ format:
 	@echo "Formatting code with black..."
 	@poetry run black src/
 	@echo "Format complete!"
-
-## proto: Generate Python code from proto files
-proto:
-	@echo "Generating protobuf code..."
-	@poetry run python -m grpc_tools.protoc -I. \
-		--python_out=. \
-		--grpc_python_out=. \
-		proto/*.proto
-	@echo "Proto generation complete!"
 
 ## deps: Install dependencies
 deps:
