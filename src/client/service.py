@@ -208,9 +208,7 @@ class ClientService:
             ValueError: If mock_websocket is not provided
         """
         if mock_websocket is None:
-            raise ValueError(
-                "_set_test_mode requires a mock_websocket object"
-            )
+            raise ValueError("_set_test_mode requires a mock_websocket object")
         self._connected = True
         self.websocket = mock_websocket
 
