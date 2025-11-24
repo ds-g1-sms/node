@@ -12,7 +12,7 @@ Message Format:
     }
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
 import json
 
@@ -117,7 +117,7 @@ class RoomsListResponse:
         total_count: Total number of rooms
     """
 
-    rooms: list
+    rooms: List[RoomInfo]
     total_count: int
 
     @classmethod
