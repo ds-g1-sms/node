@@ -131,23 +131,17 @@ class ClientService:
         if not self.is_connected:
             raise ConnectionError("Not connected to a node server")
 
-        # Create the request message
-        # Note: request object is prepared but not sent in stub implementation
-        # request = CreateRoomRequest(
-        #     room_name=room_name, creator_id=creator_id
-        # )
-
         logger.info(
             f"Sending create_room request for '{room_name}' by {creator_id}"
         )
 
         # TODO: Implement actual WebSocket send/receive
-        # For now, this is a stub that returns a mock response
-        # Real implementation would:
-        # 1. await self.websocket.send(request.to_json())
-        # 2. response_json = await self.websocket.recv()
-        # 3. response = RoomCreatedResponse.from_json(response_json)
-        # 4. return response
+        # Real implementation:
+        # 1. request = CreateRoomRequest(room_name, creator_id)
+        # 2. await self.websocket.send(request.to_json())
+        # 3. response_json = await self.websocket.recv()
+        # 4. response = RoomCreatedResponse.from_json(response_json)
+        # 5. return response
 
         # Stub response for development
         stub_response = RoomCreatedResponse(
@@ -204,6 +198,21 @@ class ClientService:
             - Support multiple handlers for different message types
         """
         self._message_handler = handler
+
+    def _set_test_mode(self, mock_websocket: object = None) -> None:
+        """
+        Set the service in test mode with a mock connection.
+
+        This is a helper method for testing that allows bypassing
+        actual WebSocket connections.
+
+        Args:
+            mock_websocket: Optional mock websocket object
+
+        Note: This should only be used in tests or demos.
+        """
+        self._connected = True
+        self.websocket = mock_websocket or object()
 
     # TODO: Future methods to implement:
     # - async def join_room(

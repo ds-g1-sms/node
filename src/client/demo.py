@@ -52,10 +52,8 @@ async def demo_create_room():
         logger.info(
             "Skipping connection - demonstrating stub functionality only"
         )
-        # Mark as connected for demo purposes to allow stub operations
-        service._connected = True
-        # Create a mock websocket object
-        service.websocket = object()
+        # Use test mode for demo purposes to allow stub operations
+        service._set_test_mode()
 
     # Create a room (using stub implementation)
     logger.info("\nAttempting to create a room...")
@@ -88,9 +86,8 @@ async def demo_multiple_rooms():
     logger.info("Client Service Demo - Multiple Rooms")
     logger.info("=" * 60)
 
-    # Mark as connected for demo purposes
-    service._connected = True
-    service.websocket = object()
+    # Use test mode for demo purposes
+    service._set_test_mode()
 
     # Create multiple rooms
     rooms = [

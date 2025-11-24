@@ -85,9 +85,8 @@ async def test_client_service_stub_create_room():
     """Test that create_room stub works with mock connection."""
     service = ClientService(node_url="ws://localhost:8000")
 
-    # Manually mark as connected for testing
-    service._connected = True
-    service.websocket = object()
+    # Set test mode to bypass actual connection
+    service._set_test_mode()
 
     # Call create_room with stub implementation
     response = await service.create_room(
