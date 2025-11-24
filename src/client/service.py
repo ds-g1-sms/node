@@ -123,7 +123,6 @@ class ClientService:
             ValueError: If response is invalid
 
         TODO:
-            - Implement full request/response cycle
             - Add timeout handling
             - Add validation for room_name and creator_id
             - Handle node rejection (e.g., duplicate room name)
@@ -135,25 +134,19 @@ class ClientService:
             f"Sending create_room request for '{room_name}' by {creator_id}"
         )
 
-        # TODO: Implement actual WebSocket send/receive
-        # Real implementation:
-        # 1. request = CreateRoomRequest(room_name, creator_id)
-        # 2. await self.websocket.send(request.to_json())
-        # 3. response_json = await self.websocket.recv()
-        # 4. response = RoomCreatedResponse.from_json(response_json)
-        # 5. return response
+        # Import here to avoid issues
+        from .protocol import CreateRoomRequest
 
-        # Stub response for development
-        stub_response = RoomCreatedResponse(
-            room_id=f"room_{room_name}_{creator_id}",
-            room_name=room_name,
-            node_id="node_stub_001",
-            success=True,
-            message="Room creation stubbed - not yet implemented",
-        )
+        # Create and send request
+        request = CreateRoomRequest(room_name, creator_id)
+        await self.websocket.send(request.to_json())
 
-        logger.info(f"Received room_created response: {stub_response}")
-        return stub_response
+        # Receive response
+        response_json = await self.websocket.recv()
+        response = RoomCreatedResponse.from_json(response_json)
+
+        logger.info(f"Received room_created response: {response}")
+        return response
 
     async def handle_messages(self) -> None:
         """
@@ -207,12 +200,55 @@ class ClientService:
         actual WebSocket connections.
 
         Args:
-            mock_websocket: Optional mock websocket object
+            mock_websocket: Required mock websocket object with send/recv
 
         Note: This should only be used in tests or demos.
+
+        Raises:
+            ValueError: If mock_websocket is not provided
         """
+        if mock_websocket is None:
+            raise ValueError(
+                "_set_test_mode requires a mock_websocket object"
+            )
         self._connected = True
-        self.websocket = mock_websocket or object()
+        self.websocket = mock_websocket
+
+    async def list_rooms(self):
+        """
+        Request a list of all rooms on the connected node.
+
+        Returns:
+            RoomsListResponse containing list of rooms and metadata
+
+        Raises:
+            ConnectionError: If not connected to a node
+
+        TODO:
+            - Add timeout handling
+            - Handle node errors gracefully
+        """
+        if not self.is_connected:
+            raise ConnectionError("Not connected to a node server")
+
+        logger.info("Sending list_rooms request")
+
+        # Import here to avoid circular dependency issues
+        from .protocol import ListRoomsRequest, RoomsListResponse
+
+        # Create and send request
+        request = ListRoomsRequest()
+        await self.websocket.send(request.to_json())
+
+        # Receive response
+        response_json = await self.websocket.recv()
+        response = RoomsListResponse.from_json(response_json)
+
+        logger.info(
+            f"Received rooms_list response with "
+            f"{response.total_count} rooms"
+        )
+        return response
 
     # TODO: Future methods to implement:
     # - async def join_room(
@@ -224,5 +260,4 @@ class ClientService:
     # - async def send_message(
     #       self, room_id: str, message: str, user_id: str
     #   ) -> bool
-    # - async def list_rooms(self) -> List[RoomInfo]
     # - async def get_room_info(self, room_id: str) -> RoomInfo
