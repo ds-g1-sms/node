@@ -15,7 +15,7 @@ import logging
 import uuid
 from datetime import datetime, UTC
 
-from state import NodeState
+from src.node.state import NodeState
 
 logger = logging.getLogger(__name__)
 
