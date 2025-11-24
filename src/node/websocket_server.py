@@ -158,15 +158,15 @@ class WebSocketServer:
                 room_name, creator_id, description
             )
 
-            # Create response
+            # Create response matching the specification
             response = {
                 "type": "room_created",
                 "data": {
                     "room_id": room.room_id,
                     "room_name": room.room_name,
-                    "node_id": self.room_manager.node_id,
-                    "success": True,
-                    "message": "Room created successfully",
+                    "admin_node": room.admin_node,
+                    "members": list(room.members),
+                    "created_at": room.created_at,
                 },
             }
 

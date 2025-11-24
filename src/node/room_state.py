@@ -8,6 +8,7 @@ Each node maintains its own list of rooms that it administers.
 import logging
 from typing import Dict, List, Optional
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class Room:
         creator_id: ID of the user who created the room
         admin_node: Identifier of the node administering this room
         members: Set of user IDs currently in the room
+        created_at: ISO 8601 timestamp when the room was created
     """
 
     room_id: str
@@ -33,6 +35,7 @@ class Room:
     creator_id: str
     admin_node: str
     members: set
+    created_at: str
 
     def to_dict(self) -> Dict:
         """Convert room to dictionary for serialization."""
@@ -89,7 +92,8 @@ class RoomStateManager:
         # Generate unique room ID
         room_id = str(uuid.uuid4())
 
-        # Create the room
+        # Create the room with current timestamp
+        created_at = datetime.now(timezone.utc).isoformat()
         room = Room(
             room_id=room_id,
             room_name=room_name,
@@ -97,6 +101,7 @@ class RoomStateManager:
             creator_id=creator_id,
             admin_node=self.node_id,
             members={creator_id},  # Creator is automatically a member
+            created_at=created_at,
         )
 
         self._rooms[room_id] = room

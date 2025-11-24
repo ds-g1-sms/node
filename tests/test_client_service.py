@@ -52,15 +52,15 @@ def test_room_created_response_can_be_created():
     response = RoomCreatedResponse(
         room_id="room123",
         room_name="test",
-        node_id="node1",
-        success=True,
-        message="Created",
+        admin_node="node1",
+        members=["user1"],
+        created_at="2025-11-24T15:47:37.111Z",
     )
     assert response.room_id == "room123"
     assert response.room_name == "test"
-    assert response.node_id == "node1"
-    assert response.success is True
-    assert response.message == "Created"
+    assert response.admin_node == "node1"
+    assert response.members == ["user1"]
+    assert response.created_at == "2025-11-24T15:47:37.111Z"
 
 
 def test_room_created_response_from_dict():
@@ -69,15 +69,17 @@ def test_room_created_response_from_dict():
         "data": {
             "room_id": "room123",
             "room_name": "test",
-            "node_id": "node1",
-            "success": True,
+            "admin_node": "node1",
+            "members": ["user1"],
+            "created_at": "2025-11-24T15:47:37.111Z",
         }
     }
     response = RoomCreatedResponse.from_dict(data)
     assert response.room_id == "room123"
     assert response.room_name == "test"
-    assert response.node_id == "node1"
-    assert response.success is True
+    assert response.admin_node == "node1"
+    assert response.members == ["user1"]
+    assert response.created_at == "2025-11-24T15:47:37.111Z"
 
 
 @pytest.mark.asyncio
@@ -101,9 +103,9 @@ async def test_client_service_create_room_with_mock():
                     "data": {
                         "room_id": "test_room_id",
                         "room_name": "test_room",
-                        "node_id": "test_node",
-                        "success": True,
-                        "message": "Room created successfully",
+                        "admin_node": "test_node",
+                        "members": ["test_user"],
+                        "created_at": "2025-11-24T15:47:37.111Z",
                     },
                 }
             )
@@ -119,9 +121,11 @@ async def test_client_service_create_room_with_mock():
 
     # Verify response
     assert response is not None
-    assert response.success is True
     assert response.room_name == "test_room"
     assert response.room_id == "test_room_id"
+    assert response.admin_node == "test_node"
+    assert response.members == ["test_user"]
+    assert response.created_at == "2025-11-24T15:47:37.111Z"
 
     # Verify request was sent
     assert len(mock_ws.sent_messages) == 1

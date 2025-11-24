@@ -4,8 +4,19 @@ Tests for Node Server
 Tests for room state management and WebSocket server functionality.
 """
 
+import json
 import pytest
-from src.node import RoomStateManager
+from src.node import RoomStateManager, WebSocketServer
+
+
+class MockWebSocket:
+    """Mock WebSocket for testing."""
+
+    def __init__(self):
+        self.sent_messages = []
+
+    async def send(self, message):
+        self.sent_messages.append(message)
 
 
 def test_room_state_manager_can_be_created():
@@ -177,8 +188,179 @@ def test_room_to_dict():
     assert room_dict["admin_node"] == "test_node"
 
 
-# TODO: Add WebSocket server tests with mock connections
+@pytest.mark.asyncio
+async def test_websocket_create_room_success():
+    """Test create_room WebSocket message handling."""
+    # Create room manager and WebSocket server
+    room_manager = RoomStateManager(node_id="test_node")
+    ws_server = WebSocketServer(room_manager, "localhost", 9000)
+
+    # Create a mock websocket connection
+    mock_ws = MockWebSocket()
+
+    # Create request message
+    request = json.dumps(
+        {
+            "type": "create_room",
+            "data": {
+                "room_name": "Test Room",
+                "creator_id": "user123",
+                "description": "A test room",
+            },
+        }
+    )
+
+    # Process the message
+    await ws_server.process_message(mock_ws, request)
+
+    # Verify response was sent
+    assert len(mock_ws.sent_messages) == 1
+
+    # Parse response
+    response = json.loads(mock_ws.sent_messages[0])
+
+    # Verify response structure
+    assert response["type"] == "room_created"
+    assert "data" in response
+
+    data = response["data"]
+    assert "room_id" in data
+    assert data["room_name"] == "Test Room"
+    assert data["admin_node"] == "test_node"
+    assert data["members"] == ["user123"]
+    assert "created_at" in data
+
+    # Verify room was actually created
+    assert room_manager.get_room_count() == 1
+
+
+@pytest.mark.asyncio
+async def test_websocket_create_room_duplicate_name():
+    """Test create_room with duplicate room name."""
+    # Create room manager and WebSocket server
+    room_manager = RoomStateManager(node_id="test_node")
+    ws_server = WebSocketServer(room_manager, "localhost", 9000)
+
+    # Create a mock websocket connection
+    mock_ws = MockWebSocket()
+
+    # Create first room
+    request1 = json.dumps(
+        {
+            "type": "create_room",
+            "data": {
+                "room_name": "Test Room",
+                "creator_id": "user1",
+            },
+        }
+    )
+    await ws_server.process_message(mock_ws, request1)
+
+    # Try to create duplicate room
+    request2 = json.dumps(
+        {
+            "type": "create_room",
+            "data": {
+                "room_name": "Test Room",
+                "creator_id": "user2",
+            },
+        }
+    )
+    await ws_server.process_message(mock_ws, request2)
+
+    # Should have two responses
+    assert len(mock_ws.sent_messages) == 2
+
+    # First should succeed
+    response1 = json.loads(mock_ws.sent_messages[0])
+    assert response1["type"] == "room_created"
+
+    # Second should be error
+    response2 = json.loads(mock_ws.sent_messages[1])
+    assert response2["type"] == "room_created"
+    assert response2["data"]["success"] is False
+    assert "already exists" in response2["data"]["message"]
+
+    # Only one room should be created
+    assert room_manager.get_room_count() == 1
+
+
+@pytest.mark.asyncio
+async def test_websocket_create_room_missing_fields():
+    """Test create_room with missing required fields."""
+    # Create room manager and WebSocket server
+    room_manager = RoomStateManager(node_id="test_node")
+    ws_server = WebSocketServer(room_manager, "localhost", 9000)
+
+    # Create a mock websocket connection
+    mock_ws = MockWebSocket()
+
+    # Create request missing creator_id
+    request = json.dumps(
+        {
+            "type": "create_room",
+            "data": {
+                "room_name": "Test Room",
+            },
+        }
+    )
+
+    # Process the message
+    await ws_server.process_message(mock_ws, request)
+
+    # Verify error response was sent
+    assert len(mock_ws.sent_messages) == 1
+
+    # Parse response
+    response = json.loads(mock_ws.sent_messages[0])
+
+    # Verify error response
+    assert response["type"] == "room_created"
+    assert response["data"]["success"] is False
+    assert "creator_id" in response["data"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_websocket_create_room_with_optional_description():
+    """Test create_room with optional description."""
+    # Create room manager and WebSocket server
+    room_manager = RoomStateManager(node_id="test_node")
+    ws_server = WebSocketServer(room_manager, "localhost", 9000)
+
+    # Create a mock websocket connection
+    mock_ws = MockWebSocket()
+
+    # Create request without description
+    request = json.dumps(
+        {
+            "type": "create_room",
+            "data": {
+                "room_name": "Test Room",
+                "creator_id": "user123",
+            },
+        }
+    )
+
+    # Process the message
+    await ws_server.process_message(mock_ws, request)
+
+    # Verify response was sent
+    assert len(mock_ws.sent_messages) == 1
+
+    # Parse response
+    response = json.loads(mock_ws.sent_messages[0])
+
+    # Verify success
+    assert response["type"] == "room_created"
+    assert response["data"]["room_name"] == "Test Room"
+
+    # Verify room was created without description
+    room = room_manager.get_room(response["data"]["room_id"])
+    assert room is not None
+    assert room.description is None
+
+
+# TODO: Add more WebSocket server tests
 # - Test list_rooms WebSocket message handling
-# - Test create_room WebSocket message handling
-# - Test error handling for invalid messages
+# - Test error handling for invalid JSON
 # - Test multiple concurrent client connections

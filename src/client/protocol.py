@@ -47,16 +47,16 @@ class RoomCreatedResponse:
     Attributes:
         room_id: Unique identifier for the created room
         room_name: Name of the room
-        node_id: ID of the node hosting the room
-        success: Whether the operation was successful
-        message: Optional message (e.g., error details)
+        admin_node: ID of the node hosting/administering the room
+        members: List of member user IDs in the room
+        created_at: ISO 8601 timestamp when room was created
     """
 
     room_id: str
     room_name: str
-    node_id: str
-    success: bool = True
-    message: Optional[str] = None
+    admin_node: str
+    members: List[str]
+    created_at: str
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RoomCreatedResponse":
