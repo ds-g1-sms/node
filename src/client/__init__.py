@@ -10,10 +10,16 @@ from .service import ClientService
 from .protocol import (
     CreateRoomRequest,
     RoomCreatedResponse,
+    ListRoomsRequest,
+    RoomsListResponse,
+    RoomInfo,
 )
 
 __all__ = [
     "ClientService",
     "CreateRoomRequest",
     "RoomCreatedResponse",
+    "ListRoomsRequest",
+    "RoomsListResponse",
+    "RoomInfo",
 ]
