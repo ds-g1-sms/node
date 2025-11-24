@@ -82,21 +82,6 @@ async def main():
 asyncio.run(main())
 ```
 
-### Demo Script
-
-Run the demo script to see the client service in action:
-
-```bash
-# Single room creation demo
-poetry run python -m src.client.demo
-
-# Multiple rooms demo
-poetry run python -m src.client.demo --demo multiple
-
-# Custom node URL
-poetry run python -m src.client.demo --node-url ws://node1.example.com:8000
-```
-
 ## Testing
 
 Tests are located in `tests/test_client_service.py`.
