@@ -19,6 +19,9 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+# Node modules
+node_modules/
+
 # Virtual environments
 venv/
 env/
