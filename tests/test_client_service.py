@@ -81,23 +81,54 @@ def test_room_created_response_from_dict():
 
 
 @pytest.mark.asyncio
-async def test_client_service_stub_create_room():
-    """Test that create_room stub works with mock connection."""
+async def test_client_service_create_room_with_mock():
+    """Test that create_room works with mock WebSocket."""
+    import json
+
+    # Create a mock websocket
+    class MockWebSocket:
+        def __init__(self):
+            self.sent_messages = []
+
+        async def send(self, message):
+            self.sent_messages.append(message)
+
+        async def recv(self):
+            # Return a mock response
+            return json.dumps(
+                {
+                    "type": "room_created",
+                    "data": {
+                        "room_id": "test_room_id",
+                        "room_name": "test_room",
+                        "node_id": "test_node",
+                        "success": True,
+                        "message": "Room created successfully",
+                    },
+                }
+            )
+
     service = ClientService(node_url="ws://localhost:8000")
+    mock_ws = MockWebSocket()
+    service._set_test_mode(mock_websocket=mock_ws)
 
-    # Set test mode to bypass actual connection
-    service._set_test_mode()
-
-    # Call create_room with stub implementation
+    # Call create_room with mock WebSocket
     response = await service.create_room(
         room_name="test_room", creator_id="test_user"
     )
 
-    # Verify stub response
+    # Verify response
     assert response is not None
     assert response.success is True
     assert response.room_name == "test_room"
-    assert "stub" in response.message.lower()
+    assert response.room_id == "test_room_id"
+
+    # Verify request was sent
+    assert len(mock_ws.sent_messages) == 1
+    sent_msg = json.loads(mock_ws.sent_messages[0])
+    assert sent_msg["type"] == "create_room"
+    assert sent_msg["data"]["room_name"] == "test_room"
+    assert sent_msg["data"]["creator_id"] == "test_user"
 
 
 def test_list_rooms_request_can_be_created():
@@ -238,20 +269,46 @@ async def test_client_service_list_rooms_not_connected():
 
 
 @pytest.mark.asyncio
-async def test_client_service_list_rooms_stub():
-    """Test that list_rooms stub works with mock connection."""
+async def test_client_service_list_rooms_with_mock():
+    """Test that list_rooms works with mock WebSocket."""
+    import json
+
+    # Create a mock websocket
+    class MockWebSocket:
+        def __init__(self):
+            self.sent_messages = []
+
+        async def send(self, message):
+            self.sent_messages.append(message)
+
+        async def recv(self):
+            # Return a mock response with empty room list
+            return json.dumps(
+                {
+                    "type": "rooms_list",
+                    "data": {
+                        "rooms": [],
+                        "total_count": 0,
+                    },
+                }
+            )
+
     service = ClientService(node_url="ws://localhost:8000")
+    mock_ws = MockWebSocket()
+    service._set_test_mode(mock_websocket=mock_ws)
 
-    # Set test mode to bypass actual connection
-    service._set_test_mode()
-
-    # Call list_rooms with stub implementation
+    # Call list_rooms with mock WebSocket
     response = await service.list_rooms()
 
-    # Verify stub response returns empty list
+    # Verify response returns empty list
     assert response is not None
     assert response.rooms == []
     assert response.total_count == 0
+
+    # Verify request was sent
+    assert len(mock_ws.sent_messages) == 1
+    sent_msg = json.loads(mock_ws.sent_messages[0])
+    assert sent_msg["type"] == "list_rooms"
 
 
 # TODO: Add tests for:
