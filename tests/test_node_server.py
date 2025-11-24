@@ -4,8 +4,19 @@ Tests for Node Server
 Tests for room state management and WebSocket server functionality.
 """
 
+import json
 import pytest
-from src.node import RoomStateManager
+from src.node import RoomStateManager, WebSocketServer
+
+
+class MockWebSocket:
+    """Mock WebSocket for testing."""
+
+    def __init__(self):
+        self.sent_messages = []
+
+    async def send(self, message):
+        self.sent_messages.append(message)
 
 
 def test_room_state_manager_can_be_created():
@@ -180,21 +191,11 @@ def test_room_to_dict():
 @pytest.mark.asyncio
 async def test_websocket_create_room_success():
     """Test create_room WebSocket message handling."""
-    import json
-    from src.node import WebSocketServer
-
     # Create room manager and WebSocket server
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a mock websocket connection
-    class MockWebSocket:
-        def __init__(self):
-            self.sent_messages = []
-
-        async def send(self, message):
-            self.sent_messages.append(message)
-
     mock_ws = MockWebSocket()
 
     # Create request message
@@ -236,21 +237,11 @@ async def test_websocket_create_room_success():
 @pytest.mark.asyncio
 async def test_websocket_create_room_duplicate_name():
     """Test create_room with duplicate room name."""
-    import json
-    from src.node import WebSocketServer
-
     # Create room manager and WebSocket server
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a mock websocket connection
-    class MockWebSocket:
-        def __init__(self):
-            self.sent_messages = []
-
-        async def send(self, message):
-            self.sent_messages.append(message)
-
     mock_ws = MockWebSocket()
 
     # Create first room
@@ -297,21 +288,11 @@ async def test_websocket_create_room_duplicate_name():
 @pytest.mark.asyncio
 async def test_websocket_create_room_missing_fields():
     """Test create_room with missing required fields."""
-    import json
-    from src.node import WebSocketServer
-
     # Create room manager and WebSocket server
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a mock websocket connection
-    class MockWebSocket:
-        def __init__(self):
-            self.sent_messages = []
-
-        async def send(self, message):
-            self.sent_messages.append(message)
-
     mock_ws = MockWebSocket()
 
     # Create request missing creator_id
@@ -342,21 +323,11 @@ async def test_websocket_create_room_missing_fields():
 @pytest.mark.asyncio
 async def test_websocket_create_room_with_optional_description():
     """Test create_room with optional description."""
-    import json
-    from src.node import WebSocketServer
-
     # Create room manager and WebSocket server
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a mock websocket connection
-    class MockWebSocket:
-        def __init__(self):
-            self.sent_messages = []
-
-        async def send(self, message):
-            self.sent_messages.append(message)
-
     mock_ws = MockWebSocket()
 
     # Create request without description
