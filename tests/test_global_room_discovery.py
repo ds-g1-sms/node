@@ -6,7 +6,6 @@ Tests for XML-RPC server, peer registry, and global room discovery.
 
 import json
 import pytest
-from xmlrpc.client import ServerProxy
 from unittest.mock import Mock, patch, MagicMock
 from concurrent.futures import Future
 

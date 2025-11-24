@@ -14,6 +14,8 @@ services:
       - NODE_ID=node1
       - XMLRPC_PORT=9090
       - WEBSOCKET_PORT=8080
+      - XMLRPC_ADDRESS=http://node1:9090
+      - PEER_NODES=node2:http://node2:9090,node3:http://node3:9090
     restart: unless-stopped
 
   # Node 2
@@ -31,6 +33,8 @@ services:
       - NODE_ID=node2
       - XMLRPC_PORT=9090
       - WEBSOCKET_PORT=8080
+      - XMLRPC_ADDRESS=http://node2:9090
+      - PEER_NODES=node1:http://node1:9090,node3:http://node3:9090
     restart: unless-stopped
 
   # Node 3
@@ -48,6 +52,8 @@ services:
       - NODE_ID=node3
       - XMLRPC_PORT=9090
       - WEBSOCKET_PORT=8080
+      - XMLRPC_ADDRESS=http://node3:9090
+      - PEER_NODES=node1:http://node1:9090,node2:http://node2:9090
     restart: unless-stopped
 
   # Client
