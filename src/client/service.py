@@ -214,6 +214,50 @@ class ClientService:
         self._connected = True
         self.websocket = mock_websocket or object()
 
+    async def list_rooms(self):
+        """
+        Request a list of all rooms on the connected node.
+
+        Returns:
+            RoomsListResponse containing list of rooms and metadata
+
+        Raises:
+            ConnectionError: If not connected to a node
+
+        TODO:
+            - Implement full request/response cycle
+            - Add timeout handling
+            - Handle node errors gracefully
+        """
+        if not self.is_connected:
+            raise ConnectionError("Not connected to a node server")
+
+        logger.info("Sending list_rooms request")
+
+        # TODO: Implement actual WebSocket send/receive
+        # Real implementation:
+        # 1. request = ListRoomsRequest()
+        # 2. await self.websocket.send(request.to_json())
+        # 3. response_json = await self.websocket.recv()
+        # 4. response = RoomsListResponse.from_json(response_json)
+        # 5. return response
+
+        # Import here to avoid circular dependency issues
+        from .protocol import RoomsListResponse
+
+        # Stub response for development
+        stub_response_dict = {
+            "type": "rooms_list",
+            "data": {
+                "rooms": [],
+                "total_count": 0,
+            },
+        }
+
+        response = RoomsListResponse.from_dict(stub_response_dict)
+        logger.info(f"Received rooms_list response: {response}")
+        return response
+
     # TODO: Future methods to implement:
     # - async def join_room(
     #       self, room_id: str, user_id: str
@@ -224,5 +268,4 @@ class ClientService:
     # - async def send_message(
     #       self, room_id: str, message: str, user_id: str
     #   ) -> bool
-    # - async def list_rooms(self) -> List[RoomInfo]
     # - async def get_room_info(self, room_id: str) -> RoomInfo
