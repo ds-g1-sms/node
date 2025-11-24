@@ -200,12 +200,19 @@ class ClientService:
         actual WebSocket connections.
 
         Args:
-            mock_websocket: Optional mock websocket object
+            mock_websocket: Required mock websocket object with send/recv
 
         Note: This should only be used in tests or demos.
+
+        Raises:
+            ValueError: If mock_websocket is not provided
         """
+        if mock_websocket is None:
+            raise ValueError(
+                "_set_test_mode requires a mock_websocket object"
+            )
         self._connected = True
-        self.websocket = mock_websocket or object()
+        self.websocket = mock_websocket
 
     async def list_rooms(self):
         """

@@ -143,6 +143,7 @@ class WebSocketServer:
             request_data = data.get("data", {})
             room_name = request_data.get("room_name")
             creator_id = request_data.get("creator_id")
+            description = request_data.get("description")
 
             if not room_name or not creator_id:
                 raise ValueError("Missing room_name or creator_id")
@@ -153,7 +154,9 @@ class WebSocketServer:
             )
 
             # Create the room
-            room = self.room_manager.create_room(room_name, creator_id)
+            room = self.room_manager.create_room(
+                room_name, creator_id, description
+            )
 
             # Create response
             response = {
