@@ -5,7 +5,8 @@ Manages the registry of peer nodes in the distributed system.
 """
 
 import logging
-from typing import Dict, List
+import socket
+from typing import Dict, List, Any
 from xmlrpc.client import ServerProxy, Fault
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -85,8 +86,6 @@ class PeerRegistry:
             proxy = ServerProxy(node_address, allow_none=True)
 
             # Set timeout (note: this is a workaround for Python's xmlrpc.client)
-            import socket
-
             old_timeout = socket.getdefaulttimeout()
             try:
                 socket.setdefaulttimeout(self.timeout)
@@ -105,7 +104,7 @@ class PeerRegistry:
             logger.error(f"Failed to query {node_id}: {e}")
             raise
 
-    def discover_global_rooms(self, local_rooms: List[Dict]) -> Dict[str, any]:
+    def discover_global_rooms(self, local_rooms: List[Dict]) -> Dict[str, Any]:
         """
         Query all peer nodes for their hosted rooms and aggregate results.
 
