@@ -11,6 +11,7 @@ import websockets
 from websockets.server import WebSocketServerProtocol
 
 from .room_state import RoomStateManager
+from .peer_registry import PeerRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,13 @@ class WebSocketServer:
     including requests to list rooms, create rooms, join rooms, etc.
     """
 
-    def __init__(self, room_manager: RoomStateManager, host: str, port: int):
+    def __init__(
+        self,
+        room_manager: RoomStateManager,
+        host: str,
+        port: int,
+        peer_registry: PeerRegistry = None,
+    ):
         """
         Initialize the WebSocket server.
 
@@ -31,10 +38,12 @@ class WebSocketServer:
             room_manager: The room state manager instance
             host: Host address to bind to
             port: Port to listen on
+            peer_registry: Optional peer registry for distributed operations
         """
         self.room_manager = room_manager
         self.host = host
         self.port = port
+        self.peer_registry = peer_registry
         self.clients: Set[WebSocketServerProtocol] = set()
         self.server = None
 
@@ -93,6 +102,8 @@ class WebSocketServer:
                 await self.handle_list_rooms(websocket)
             elif message_type == "create_room":
                 await self.handle_create_room(websocket, data)
+            elif message_type == "discover_rooms":
+                await self.handle_discover_rooms(websocket, data)
             else:
                 logger.warning(f"Unknown message type: {message_type}")
                 await self.send_error(
@@ -181,6 +192,64 @@ class WebSocketServer:
             logger.error(f"Unexpected error creating room: {e}")
             await self.send_error(
                 websocket, "Internal server error", error_type="room_created"
+            )
+
+    async def handle_discover_rooms(
+        self, websocket: WebSocketServerProtocol, data: dict
+    ):
+        """
+        Handle a discover_rooms request for global room discovery.
+
+        Args:
+            websocket: The WebSocket connection
+            data: The request data
+        """
+        logger.info("Processing discover_rooms request")
+
+        try:
+            # Check if peer registry is available
+            if not self.peer_registry:
+                # Fall back to local rooms only
+                logger.warning(
+                    "Peer registry not available, returning local rooms only"
+                )
+                rooms = self.room_manager.list_rooms()
+                response = {
+                    "type": "global_rooms_list",
+                    "data": {
+                        "rooms": rooms,
+                        "total_count": len(rooms),
+                        "nodes_queried": [self.room_manager.node_id],
+                        "nodes_available": [self.room_manager.node_id],
+                        "nodes_unavailable": [],
+                    },
+                }
+            else:
+                # Get local rooms
+                local_rooms = self.room_manager.list_rooms()
+
+                # Discover rooms from all nodes (including peers)
+                discovery_result = self.peer_registry.discover_global_rooms(
+                    local_rooms
+                )
+
+                # Create response
+                response = {
+                    "type": "global_rooms_list",
+                    "data": discovery_result,
+                }
+
+            # Send response
+            await websocket.send(json.dumps(response))
+            logger.info(
+                f"Sent global_rooms_list response with "
+                f"{response['data']['total_count']} rooms"
+            )
+
+        except Exception as e:
+            logger.error(f"Error discovering rooms: {e}")
+            await self.send_error(
+                websocket, "Failed to discover rooms", error_type="error"
             )
 
     async def send_error(
