@@ -17,14 +17,17 @@ Future Enhancements:
     - Room state caching
 """
 
+import json
 import logging
 from typing import Optional, Callable
 import websockets
 from websockets.client import WebSocketClientProtocol
 
-from .protocol import RoomCreatedResponse  # noqa: F401
-
-# CreateRoomRequest will be used when full implementation is done
+from .protocol import (
+    RoomCreatedResponse,
+    JoinRoomSuccessResponse,
+    JoinRoomRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -248,10 +251,55 @@ class ClientService:
         )
         return response
 
+    async def join_room(
+        self, room_id: str, username: str
+    ) -> JoinRoomSuccessResponse:
+        """
+        Send a request to join an existing room.
+
+        Args:
+            room_id: ID of the room to join
+            username: Username of the user joining the room
+
+        Returns:
+            JoinRoomSuccessResponse with room details
+
+        Raises:
+            ConnectionError: If not connected to a node server
+            ValueError: If join fails (room not found, already in room, etc.)
+
+        TODO:
+            - Add timeout handling
+            - Add validation for room_id and username
+        """
+        if not self.is_connected:
+            raise ConnectionError("Not connected to a node server")
+
+        logger.info(f"Sending join_room request for room '{room_id}'")
+
+        # Create and send request
+        request = JoinRoomRequest(room_id, username)
+        await self.websocket.send(request.to_json())
+
+        # Receive response
+        response_json = await self.websocket.recv()
+        response_data = json.loads(response_json)
+
+        # Check response type
+        if response_data.get("type") == "join_room_success":
+            response = JoinRoomSuccessResponse.from_json(response_json)
+            logger.info(f"Successfully joined room '{response.room_name}'")
+            return response
+        elif response_data.get("type") == "join_room_error":
+            error_data = response_data.get("data", {})
+            error_msg = error_data.get("error", "Unknown error")
+            logger.error(f"Failed to join room: {error_msg}")
+            raise ValueError(error_msg)
+        else:
+            logger.error(f"Unexpected response type: {response_data}")
+            raise ValueError("Unexpected response from server")
+
     # TODO: Future methods to implement:
-    # - async def join_room(
-    #       self, room_id: str, user_id: str
-    #   ) -> JoinRoomResponse
     # - async def leave_room(
     #       self, room_id: str, user_id: str
     #   ) -> bool

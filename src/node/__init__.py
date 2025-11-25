@@ -7,9 +7,13 @@ chat system, including room state management and WebSocket server.
 
 from .room_state import RoomStateManager, Room
 from .websocket_server import WebSocketServer
+from .xmlrpc_server import XMLRPCServer
+from .peer_registry import PeerRegistry
 
 __all__ = [
     "RoomStateManager",
     "Room",
     "WebSocketServer",
+    "XMLRPCServer",
+    "PeerRegistry",
 ]
