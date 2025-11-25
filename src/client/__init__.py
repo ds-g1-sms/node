@@ -7,6 +7,8 @@ protocol message definitions.
 """
 
 from .service import ClientService
+from .message_buffer import MessageBuffer
+from .chat_client import ChatClient
 from .protocol import (
     CreateRoomRequest,
     RoomCreatedResponse,
@@ -25,6 +27,8 @@ from .protocol import (
 
 __all__ = [
     "ClientService",
+    "MessageBuffer",
+    "ChatClient",
     "CreateRoomRequest",
     "RoomCreatedResponse",
     "ListRoomsRequest",
