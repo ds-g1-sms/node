@@ -160,6 +160,7 @@ class WebSocketServer:
             message: The message to broadcast
             exclude_user: Optional username to exclude from broadcast
         """
+
         async def _do_broadcast():
             if room_id not in self._room_clients:
                 return
