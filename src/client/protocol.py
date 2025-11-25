@@ -150,8 +150,137 @@ class RoomsListResponse:
         return cls.from_dict(data)
 
 
+@dataclass
+class JoinRoomRequest:
+    """
+    Request to join an existing room.
+
+    Attributes:
+        room_id: ID of the room to join
+        username: Username of the joining user
+    """
+
+    room_id: str
+    username: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {"type": "join_room", "data": asdict(self)}
+
+    def to_json(self) -> str:
+        """Convert to JSON string."""
+        return json.dumps(self.to_dict())
+
+
+@dataclass
+class JoinRoomSuccessResponse:
+    """
+    Response indicating successful room join.
+
+    Attributes:
+        room_id: Unique identifier for the room
+        room_name: Name of the room
+        description: Optional room description
+        members: List of member usernames in the room
+        member_count: Number of current members
+        admin_node: ID of the node administering this room
+    """
+
+    room_id: str
+    room_name: str
+    description: Optional[str]
+    members: List[str]
+    member_count: int
+    admin_node: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "JoinRoomSuccessResponse":
+        """Create from dictionary."""
+        response_data = data.get("data", data)
+        return cls(
+            room_id=response_data["room_id"],
+            room_name=response_data["room_name"],
+            description=response_data.get("description"),
+            members=response_data["members"],
+            member_count=response_data["member_count"],
+            admin_node=response_data["admin_node"],
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "JoinRoomSuccessResponse":
+        """Create from JSON string."""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+
+@dataclass
+class JoinRoomErrorResponse:
+    """
+    Response indicating failed room join.
+
+    Attributes:
+        room_id: ID of the room that was requested
+        error: Error message
+        error_code: Error code (e.g., ROOM_NOT_FOUND, ALREADY_IN_ROOM)
+    """
+
+    room_id: str
+    error: str
+    error_code: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "JoinRoomErrorResponse":
+        """Create from dictionary."""
+        response_data = data.get("data", data)
+        return cls(
+            room_id=response_data["room_id"],
+            error=response_data["error"],
+            error_code=response_data["error_code"],
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "JoinRoomErrorResponse":
+        """Create from JSON string."""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+
+@dataclass
+class MemberJoinedNotification:
+    """
+    Notification that a new member joined a room.
+
+    Attributes:
+        room_id: ID of the room
+        username: Username of the new member
+        member_count: Updated member count
+        timestamp: ISO 8601 timestamp of the join
+    """
+
+    room_id: str
+    username: str
+    member_count: int
+    timestamp: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MemberJoinedNotification":
+        """Create from dictionary."""
+        response_data = data.get("data", data)
+        return cls(
+            room_id=response_data["room_id"],
+            username=response_data["username"],
+            member_count=response_data["member_count"],
+            timestamp=response_data["timestamp"],
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "MemberJoinedNotification":
+        """Create from JSON string."""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+
 # TODO: Add more message types as needed:
-# - JoinRoomRequest / JoinRoomResponse
 # - SendMessageRequest
 # - MessageReceivedNotification
 # - LeaveRoomRequest
