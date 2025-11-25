@@ -5,9 +5,9 @@
 # For format details, see: https://gh.io/customagents/config
 
 name: 'developer-agent'
-description: 'Used for development on the P2P chat service project. Can use Makefile to access dev tools.'
+description: 'Used for development on the P2P chat service project.'
 ---
 
 # My Agent
 
-Other than developing as given instructions, agent shall run 'make format' to make sure code is formatted and 'make lint' to check the linting of the code.
+Other than developing as given instructions, agent shall run `flake8` and `pylint` on `src/` through `poetry` to check linting and `black` through `poetry` to format `src/`.
