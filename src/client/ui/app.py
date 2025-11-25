@@ -581,8 +581,6 @@ class ChatApp(App):
         status = self.query_one("#create-room-status", Static)
 
         room_name = name_input.value.strip()
-        # Description input is captured for future use when API supports it
-        _ = desc_input.value.strip()
 
         if not room_name:
             status.update("[red]Please enter a room name[/]")
@@ -748,16 +746,15 @@ class ChatApp(App):
                 self.current_members.append(username)
                 self.call_from_thread(self._update_chat_screen)
 
-    # pylint: disable=unused-argument
-    def _on_ordering_gap(self, room_id: str) -> None:
+    def _on_ordering_gap(  # pylint: disable=unused-argument
+        self, room_id: str
+    ) -> None:
         """Callback when a gap is detected in message ordering."""
         self.call_from_thread(
             lambda: self._add_system_message(
                 "⚠️ Some messages may be out of order", "warning"
             )
         )
-
-    # pylint: enable=unused-argument
 
     def _add_chat_message(self, message: Dict[str, Any]) -> None:
         """Add a chat message to the display."""
