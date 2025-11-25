@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 # Maximum number of messages to keep in buffer
 DEFAULT_MAX_BUFFER_SIZE = 1000
 
+# Maximum number of displayed message IDs to track for deduplication
+# This limits memory growth in long-running applications
+DEFAULT_MAX_DISPLAYED_IDS = 5000
+
 
 class MessageBuffer:
     """
@@ -40,19 +44,28 @@ class MessageBuffer:
         max_buffer_size: Maximum number of messages to buffer
     """
 
-    def __init__(self, max_buffer_size: int = DEFAULT_MAX_BUFFER_SIZE):
+    def __init__(
+        self,
+        max_buffer_size: int = DEFAULT_MAX_BUFFER_SIZE,
+        max_displayed_ids: int = DEFAULT_MAX_DISPLAYED_IDS,
+    ):
         """
         Initialize the message buffer.
 
         Args:
             max_buffer_size: Maximum number of messages to keep in buffer.
                              Older messages will be removed when exceeded.
+            max_displayed_ids: Maximum number of displayed message IDs to track.
+                               Prevents unbounded memory growth.
         """
         self.messages: List[Dict[str, Any]] = []
         self.last_displayed_seq: int = 0
         self.max_buffer_size = max_buffer_size
+        self._max_displayed_ids = max_displayed_ids
         self._seen_message_ids: set = set()
-        self._displayed_message_ids: set = set()
+        # Track displayed IDs: set for O(1) lookup, list for FIFO order
+        self._displayed_message_ids_set: set = set()
+        self._displayed_message_ids_list: List[str] = []
 
     def add_message(self, message: Dict[str, Any]) -> bool:
         """
@@ -95,7 +108,7 @@ class MessageBuffer:
         if message_id:
             if (
                 message_id in self._seen_message_ids
-                or message_id in self._displayed_message_ids
+                or message_id in self._displayed_message_ids_set
             ):
                 logger.debug("Duplicate message ignored: %s", message_id)
                 return False
@@ -108,16 +121,20 @@ class MessageBuffer:
             )
             return False
 
-        # Check for duplicate by sequence_number in buffer
-        for existing in self.messages:
-            if existing.get("sequence_number") == sequence_number:
+        # Find insert position using binary search
+        insert_pos = self._find_insert_position(sequence_number)
+
+        # Check for duplicate by sequence_number using binary search result
+        if insert_pos < len(self.messages):
+            if (
+                self.messages[insert_pos].get("sequence_number")
+                == sequence_number
+            ):
                 logger.debug(
                     "Duplicate sequence_number ignored: %s", sequence_number
                 )
                 return False
 
-        # Find insert position using binary search
-        insert_pos = self._find_insert_position(sequence_number)
         self.messages.insert(insert_pos, message)
 
         # Track message_id for deduplication
@@ -169,7 +186,10 @@ class MessageBuffer:
                 msg_id = msg.get("message_id")
                 if msg_id:
                     self._seen_message_ids.discard(msg_id)
-                    self._displayed_message_ids.add(msg_id)
+                    self._displayed_message_ids_set.add(msg_id)
+                    self._displayed_message_ids_list.append(msg_id)
+            # Enforce limit on displayed IDs to prevent unbounded growth
+            self._enforce_displayed_ids_limit()
 
         return displayable
 
@@ -228,7 +248,8 @@ class MessageBuffer:
         self.messages.clear()
         self.last_displayed_seq = 0
         self._seen_message_ids.clear()
-        self._displayed_message_ids.clear()
+        self._displayed_message_ids_set.clear()
+        self._displayed_message_ids_list.clear()
         logger.debug("Message buffer cleared")
 
     def set_last_displayed_seq(self, sequence_number: int) -> None:
@@ -285,3 +306,19 @@ class MessageBuffer:
             logger.warning(
                 "Buffer limit exceeded, removed %s oldest messages", excess
             )
+
+    def _enforce_displayed_ids_limit(self) -> None:
+        """
+        Remove oldest displayed message IDs if limit is exceeded.
+
+        This prevents unbounded memory growth from tracking too many
+        displayed message IDs in long-running applications.
+        """
+        if len(self._displayed_message_ids_list) > self._max_displayed_ids:
+            excess = (
+                len(self._displayed_message_ids_list) - self._max_displayed_ids
+            )
+            # Remove oldest IDs (FIFO)
+            for _ in range(excess):
+                old_id = self._displayed_message_ids_list.pop(0)
+                self._displayed_message_ids_set.discard(old_id)
