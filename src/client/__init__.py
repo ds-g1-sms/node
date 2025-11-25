@@ -2,8 +2,8 @@
 Client Package
 
 This package provides the client-side functionality for the distributed
-chat system, including the ClientService for connecting to nodes and
-protocol message definitions.
+chat system, including the ClientService for connecting to nodes,
+protocol message definitions, and the terminal user interface.
 """
 
 from .service import ClientService
