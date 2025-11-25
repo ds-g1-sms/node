@@ -1,13 +1,13 @@
 services:
-  # Node 1
+  # Node 1 - Distributed chat server node
   node1:
     build:
       context: .
       dockerfile: Dockerfile.node
     container_name: chat-node1
     ports:
-      - "8081:8080"
-      - "9091:9090"
+      - "8081:8080"  # WebSocket: connect from host via localhost:8081
+      - "9091:9090"  # XML-RPC: inter-node communication
     networks:
       - chat-network
     environment:
@@ -18,15 +18,15 @@ services:
       - PEER_NODES=node2:http://node2:9090,node3:http://node3:9090
     restart: unless-stopped
 
-  # Node 2
+  # Node 2 - Distributed chat server node
   node2:
     build:
       context: .
       dockerfile: Dockerfile.node
     container_name: chat-node2
     ports:
-      - "8082:8080"
-      - "9092:9090"
+      - "8082:8080"  # WebSocket: connect from host via localhost:8082
+      - "9092:9090"  # XML-RPC: inter-node communication
     networks:
       - chat-network
     environment:
@@ -37,15 +37,15 @@ services:
       - PEER_NODES=node1:http://node1:9090,node3:http://node3:9090
     restart: unless-stopped
 
-  # Node 3
+  # Node 3 - Distributed chat server node
   node3:
     build:
       context: .
       dockerfile: Dockerfile.node
     container_name: chat-node3
     ports:
-      - "8083:8080"
-      - "9093:9090"
+      - "8083:8080"  # WebSocket: connect from host via localhost:8083
+      - "9093:9090"  # XML-RPC: inter-node communication
     networks:
       - chat-network
     environment:
@@ -56,24 +56,27 @@ services:
       - PEER_NODES=node1:http://node1:9090,node2:http://node2:9090
     restart: unless-stopped
 
-  # Client
-  client:
-    build:
-      context: .
-      dockerfile: Dockerfile.client
-    container_name: chat-client
-    stdin_open: true
-    tty: true
-    networks:
-      - chat-network
-    environment:
-      - NODE_URL=ws://node1:8080
-    depends_on:
-      - node1
-      - node2
-      - node3
-    restart: unless-stopped
-
 networks:
   chat-network:
     driver: bridge
+
+# =============================================================================
+# USAGE INSTRUCTIONS
+# =============================================================================
+# 1. Start the nodes:
+#    docker compose up -d
+#
+# 2. Run the chat client locally (not in Docker):
+#    poetry run chat-client
+#
+# 3. Connect to any node from the chat client:
+#    - Node 1: localhost:8081
+#    - Node 2: localhost:8082
+#    - Node 3: localhost:8083
+#
+# 4. View logs:
+#    docker compose logs -f
+#
+# 5. Stop the nodes:
+#    docker compose down
+# =============================================================================

@@ -453,13 +453,11 @@ class ChatApp(App):
 
             status.update("[yellow]Connecting...[/]")
 
-            # Parse address
+            # Parse address - add ws:// prefix if not present
             if "://" not in address:
-                address = f"ws://{address}"
-            if not address.endswith("/"):
-                ws_url = f"{address}/ws"
+                ws_url = f"ws://{address}"
             else:
-                ws_url = f"{address}ws"
+                ws_url = address
 
             # Create client and connect
             self.client = ChatClient(ws_url)
