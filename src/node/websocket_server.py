@@ -229,6 +229,8 @@ class WebSocketServer:
                 await self.handle_discover_rooms(websocket, data)
             elif message_type == "join_room":
                 await self.handle_join_room(websocket, data)
+            elif message_type == "send_message":
+                await self.handle_send_message(websocket, data)
             else:
                 logger.warning(f"Unknown message type: {message_type}")
                 await self.send_error(
@@ -626,5 +628,329 @@ class WebSocketServer:
         response = {
             "type": error_type,
             "data": {"success": False, "message": error_message},
+        }
+        await websocket.send(json.dumps(response))
+
+    async def handle_send_message(
+        self, websocket: WebSocketServerProtocol, data: dict
+    ):
+        """
+        Handle a send_message request from a client.
+
+        Args:
+            websocket: The WebSocket connection
+            data: The request data
+        """
+        try:
+            # Extract parameters
+            request_data = data.get("data", {})
+            room_id = request_data.get("room_id")
+            username = request_data.get("username")
+            content = request_data.get("content")
+
+            # Validate required fields
+            if not room_id or not username:
+                await self.send_message_error(
+                    websocket,
+                    room_id or "",
+                    "Missing room_id or username",
+                    "INVALID_REQUEST",
+                )
+                return
+
+            # Validate message content
+            if not content or len(content) == 0:
+                await self.send_message_error(
+                    websocket,
+                    room_id,
+                    "Message content cannot be empty",
+                    "INVALID_CONTENT",
+                )
+                return
+
+            if len(content) > 5000:
+                await self.send_message_error(
+                    websocket,
+                    room_id,
+                    "Message content too long (max 5000 characters)",
+                    "INVALID_CONTENT",
+                )
+                return
+
+            logger.info(
+                f"Processing send_message request: "
+                f"room {room_id} from {username}"
+            )
+
+            # Check if user is member of the room (local check)
+            if not self._is_client_in_room(websocket, room_id):
+                await self.send_message_error(
+                    websocket,
+                    room_id,
+                    "You are not a member of this room",
+                    "NOT_MEMBER",
+                )
+                return
+
+            # Check if this node administers the room
+            room = self.room_manager.get_room(room_id)
+
+            if room:
+                # Local message - this node is the administrator
+                result = await self._handle_local_message(
+                    websocket, room_id, username, content
+                )
+            else:
+                # Remote message - forward to administrator
+                result = await self._handle_remote_message(
+                    websocket, room_id, username, content
+                )
+
+            if result["success"]:
+                # Send confirmation to sender
+                confirmation = {
+                    "type": "message_sent",
+                    "data": {
+                        "room_id": room_id,
+                        "message_id": result["message_id"],
+                        "sequence_number": result["sequence_number"],
+                        "timestamp": result["timestamp"],
+                    },
+                }
+                await websocket.send(json.dumps(confirmation))
+                logger.info(
+                    f"Message from {username} sent successfully "
+                    f"(seq: {result['sequence_number']})"
+                )
+            else:
+                await self.send_message_error(
+                    websocket,
+                    room_id,
+                    result.get("error", "Failed to send message"),
+                    result.get("error_code", "UNKNOWN_ERROR"),
+                )
+
+        except Exception as e:
+            logger.error(f"Error processing send_message: {e}")
+            room_id = data.get("data", {}).get("room_id", "")
+            await self.send_message_error(
+                websocket, room_id, str(e), "INTERNAL_ERROR"
+            )
+
+    def _is_client_in_room(
+        self, websocket: WebSocketServerProtocol, room_id: str
+    ) -> bool:
+        """
+        Check if a client's websocket is registered as being in a room.
+
+        Args:
+            websocket: The WebSocket connection
+            room_id: The room ID
+
+        Returns:
+            bool: True if client is in the room
+        """
+        if websocket not in self._client_rooms:
+            return False
+        return room_id in self._client_rooms[websocket]
+
+    async def _handle_local_message(
+        self,
+        websocket: WebSocketServerProtocol,
+        room_id: str,
+        username: str,
+        content: str,
+    ) -> dict:
+        """
+        Handle a message for a room administered by this node.
+
+        Args:
+            websocket: The WebSocket connection
+            room_id: The room ID
+            username: The username
+            content: The message content
+
+        Returns:
+            dict: Result with success status and message data or error
+        """
+        # Add message to room (assigns sequence number)
+        message = self.room_manager.add_message(room_id, username, content)
+
+        if not message:
+            return {
+                "success": False,
+                "error": "Failed to add message",
+                "error_code": "INTERNAL_ERROR",
+            }
+
+        # Broadcast to all room members (including sender)
+        await self._broadcast_message_to_room(room_id, message)
+
+        return {
+            "success": True,
+            "message_id": message["message_id"],
+            "sequence_number": message["sequence_number"],
+            "timestamp": message["timestamp"],
+        }
+
+    async def _handle_remote_message(
+        self,
+        websocket: WebSocketServerProtocol,
+        room_id: str,
+        username: str,
+        content: str,
+    ) -> dict:
+        """
+        Handle a message for a room administered by another node.
+
+        Args:
+            websocket: The WebSocket connection
+            room_id: The room ID
+            username: The username
+            content: The message content
+
+        Returns:
+            dict: Result with success status and message data or error
+        """
+        if not self.peer_registry:
+            return {
+                "success": False,
+                "error": "Room not found",
+                "error_code": "ROOM_NOT_FOUND",
+            }
+
+        # Find the administrator node for this room
+        local_rooms = self.room_manager.list_rooms()
+        discovery_result = self.peer_registry.discover_global_rooms(local_rooms)
+
+        # Find the room in the discovered rooms
+        target_room = None
+        for room in discovery_result.get("rooms", []):
+            if room.get("room_id") == room_id:
+                target_room = room
+                break
+
+        if not target_room:
+            return {
+                "success": False,
+                "error": "Room not found",
+                "error_code": "ROOM_NOT_FOUND",
+            }
+
+        # Get the admin node address
+        admin_node = target_room.get("admin_node")
+        node_address = target_room.get("node_address")
+
+        if not node_address:
+            node_address = self.peer_registry.get_peer_address(admin_node)
+
+        if not node_address:
+            return {
+                "success": False,
+                "error": "Administrator node unavailable",
+                "error_code": "ADMIN_NODE_UNAVAILABLE",
+            }
+
+        # Forward message to administrator via XML-RPC
+        try:
+            proxy = ServerProxy(node_address, allow_none=True)
+            result = proxy.forward_message(
+                room_id, username, content, self.room_manager.node_id
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Failed to forward message: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to contact administrator node: {e}",
+                "error_code": "ADMIN_NODE_UNAVAILABLE",
+            }
+
+    async def _broadcast_message_to_room(self, room_id: str, message: dict):
+        """
+        Broadcast a message to all room members.
+
+        For local clients, sends via WebSocket.
+        For remote nodes with members in the room, calls XML-RPC.
+
+        Args:
+            room_id: The room ID
+            message: The message data dict
+        """
+        # Broadcast to local clients via WebSocket
+        broadcast_msg = {"type": "new_message", "data": message}
+
+        if room_id in self._room_clients:
+            message_json = json.dumps(broadcast_msg)
+            for ws, _ in self._room_clients[room_id]:
+                try:
+                    await ws.send(message_json)
+                except websockets.exceptions.ConnectionClosed:
+                    pass
+
+        # Broadcast to remote nodes via XML-RPC
+        if self.peer_registry:
+            peers = self.peer_registry.list_peers()
+            for node_id, node_addr in peers.items():
+                try:
+                    proxy = ServerProxy(node_addr, allow_none=True)
+                    proxy.receive_message_broadcast(room_id, message)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to broadcast message to {node_id}: {e}"
+                    )
+
+    def broadcast_message_to_room_sync(self, room_id: str, message: dict):
+        """
+        Synchronous version of broadcast for use in XML-RPC callbacks.
+
+        Args:
+            room_id: The room ID
+            message: The message data dict
+        """
+        broadcast_msg = {"type": "new_message", "data": message}
+
+        async def _do_broadcast():
+            if room_id not in self._room_clients:
+                return
+            message_json = json.dumps(broadcast_msg)
+            for websocket, _ in self._room_clients[room_id]:
+                try:
+                    await websocket.send(message_json)
+                except websockets.exceptions.ConnectionClosed:
+                    pass
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(_do_broadcast())
+            else:
+                loop.run_until_complete(_do_broadcast())
+        except RuntimeError:
+            asyncio.run(_do_broadcast())
+
+    async def send_message_error(
+        self,
+        websocket: WebSocketServerProtocol,
+        room_id: str,
+        error: str,
+        error_code: str,
+    ):
+        """
+        Send a message_error response.
+
+        Args:
+            websocket: The WebSocket connection
+            room_id: The room ID
+            error: The error message
+            error_code: The error code
+        """
+        response = {
+            "type": "message_error",
+            "data": {
+                "room_id": room_id,
+                "error": error,
+                "error_code": error_code,
+            },
         }
         await websocket.send(json.dumps(response))

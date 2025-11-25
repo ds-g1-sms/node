@@ -299,11 +299,58 @@ class ClientService:
             logger.error(f"Unexpected response type: {response_data}")
             raise ValueError("Unexpected response from server")
 
+    async def send_message(
+        self, room_id: str, username: str, content: str
+    ) -> "MessageSentConfirmation":
+        """
+        Send a message to a room.
+
+        Args:
+            room_id: ID of the room to send the message to
+            username: Username of the sender
+            content: The message content
+
+        Returns:
+            MessageSentConfirmation with message details
+
+        Raises:
+            ConnectionError: If not connected to a node server
+            ValueError: If send fails (not member, invalid content, etc.)
+        """
+        if not self.is_connected:
+            raise ConnectionError("Not connected to a node server")
+
+        logger.info(f"Sending message to room '{room_id}'")
+
+        # Import here to avoid circular issues
+        from .protocol import SendMessageRequest, MessageSentConfirmation
+
+        # Create and send request
+        request = SendMessageRequest(room_id, username, content)
+        await self.websocket.send(request.to_json())
+
+        # Receive response
+        response_json = await self.websocket.recv()
+        response_data = json.loads(response_json)
+
+        # Check response type
+        if response_data.get("type") == "message_sent":
+            response = MessageSentConfirmation.from_json(response_json)
+            logger.info(
+                f"Message sent successfully (seq: {response.sequence_number})"
+            )
+            return response
+        elif response_data.get("type") == "message_error":
+            error_data = response_data.get("data", {})
+            error_msg = error_data.get("error", "Unknown error")
+            logger.error(f"Failed to send message: {error_msg}")
+            raise ValueError(error_msg)
+        else:
+            logger.error(f"Unexpected response type: {response_data}")
+            raise ValueError("Unexpected response from server")
+
     # TODO: Future methods to implement:
     # - async def leave_room(
     #       self, room_id: str, user_id: str
-    #   ) -> bool
-    # - async def send_message(
-    #       self, room_id: str, message: str, user_id: str
     #   ) -> bool
     # - async def get_room_info(self, room_id: str) -> RoomInfo
