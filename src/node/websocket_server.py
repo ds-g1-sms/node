@@ -4,10 +4,12 @@ WebSocket Server for Node
 Handles WebSocket connections from clients and processes their requests.
 """
 
+import asyncio
 import logging
 import json
 from datetime import datetime, timezone
 from typing import Set, Dict, Optional
+from xmlrpc.client import ServerProxy
 import websockets
 from websockets.server import WebSocketServerProtocol
 
@@ -158,8 +160,6 @@ class WebSocketServer:
             message: The message to broadcast
             exclude_user: Optional username to exclude from broadcast
         """
-        import asyncio
-
         async def _do_broadcast():
             if room_id not in self._room_clients:
                 return
@@ -509,8 +509,6 @@ class WebSocketServer:
 
         # Call XML-RPC on the administrator node
         try:
-            from xmlrpc.client import ServerProxy
-
             proxy = ServerProxy(node_address, allow_none=True)
             result = proxy.join_room(
                 room_id, username, self.room_manager.node_id

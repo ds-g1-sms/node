@@ -5,6 +5,7 @@ Handles XML-RPC requests from peer nodes for distributed operations.
 """
 
 import logging
+from datetime import datetime, timezone
 from xmlrpc.server import SimpleXMLRPCServer
 from threading import Thread
 from typing import List, Dict, Callable, Optional
@@ -184,8 +185,6 @@ class XMLRPCServer:
 
         # Broadcast member_joined to existing members via callback
         if self._broadcast_callback:
-            from datetime import datetime, timezone
-
             broadcast_msg = {
                 "type": "member_joined",
                 "data": {

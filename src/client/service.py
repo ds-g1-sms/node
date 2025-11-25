@@ -17,12 +17,17 @@ Future Enhancements:
     - Room state caching
 """
 
+import json
 import logging
 from typing import Optional, Callable
 import websockets
 from websockets.client import WebSocketClientProtocol
 
-from .protocol import RoomCreatedResponse, JoinRoomSuccessResponse  # noqa: F401
+from .protocol import (
+    RoomCreatedResponse,
+    JoinRoomSuccessResponse,
+    JoinRoomRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -272,16 +277,13 @@ class ClientService:
 
         logger.info(f"Sending join_room request for room '{room_id}'")
 
-        # Import here to avoid circular dependency issues
-        from .protocol import JoinRoomRequest
-
         # Create and send request
         request = JoinRoomRequest(room_id, username)
         await self.websocket.send(request.to_json())
 
         # Receive response
         response_json = await self.websocket.recv()
-        response_data = __import__("json").loads(response_json)
+        response_data = json.loads(response_json)
 
         # Check response type
         if response_data.get("type") == "join_room_success":
