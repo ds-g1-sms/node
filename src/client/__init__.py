@@ -13,6 +13,10 @@ from .protocol import (
     ListRoomsRequest,
     RoomsListResponse,
     RoomInfo,
+    JoinRoomRequest,
+    JoinRoomSuccessResponse,
+    JoinRoomErrorResponse,
+    MemberJoinedNotification,
 )
 
 __all__ = [
@@ -22,4 +26,8 @@ __all__ = [
     "ListRoomsRequest",
     "RoomsListResponse",
     "RoomInfo",
+    "JoinRoomRequest",
+    "JoinRoomSuccessResponse",
+    "JoinRoomErrorResponse",
+    "MemberJoinedNotification",
 ]
