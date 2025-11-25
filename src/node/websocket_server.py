@@ -659,7 +659,7 @@ class WebSocketServer:
                 return
 
             # Validate message content
-            if not content or len(content) == 0:
+            if not content:
                 await self.send_message_error(
                     websocket,
                     room_id,
@@ -921,12 +921,10 @@ class WebSocketServer:
                     pass
 
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(_do_broadcast())
-            else:
-                loop.run_until_complete(_do_broadcast())
+            loop = asyncio.get_running_loop()
+            loop.create_task(_do_broadcast())
         except RuntimeError:
+            # No running event loop, use asyncio.run
             asyncio.run(_do_broadcast())
 
     async def send_message_error(

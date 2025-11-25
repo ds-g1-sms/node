@@ -245,7 +245,7 @@ class XMLRPCServer:
         )
 
         # Validate message content
-        if not content or len(content) == 0:
+        if not content:
             return {
                 "success": False,
                 "error": "Message content cannot be empty",
