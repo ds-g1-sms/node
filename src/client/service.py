@@ -27,6 +27,8 @@ from .protocol import (
     RoomCreatedResponse,
     JoinRoomSuccessResponse,
     JoinRoomRequest,
+    SendMessageRequest,
+    MessageSentConfirmation,
 )
 
 logger = logging.getLogger(__name__)
@@ -301,7 +303,7 @@ class ClientService:
 
     async def send_message(
         self, room_id: str, username: str, content: str
-    ) -> "MessageSentConfirmation":
+    ) -> MessageSentConfirmation:
         """
         Send a message to a room.
 
@@ -321,9 +323,6 @@ class ClientService:
             raise ConnectionError("Not connected to a node server")
 
         logger.info(f"Sending message to room '{room_id}'")
-
-        # Import here to avoid circular issues
-        from .protocol import SendMessageRequest, MessageSentConfirmation
 
         # Create and send request
         request = SendMessageRequest(room_id, username, content)
