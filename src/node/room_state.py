@@ -27,6 +27,8 @@ class Room:
         admin_node: Identifier of the node administering this room
         members: Set of user IDs currently in the room
         created_at: ISO 8601 timestamp when the room was created
+        message_counter: Counter for assigning sequence numbers to messages
+        messages: List of messages in the room (in-memory buffer)
     """
 
     room_id: str
@@ -36,6 +38,13 @@ class Room:
     admin_node: str
     members: set
     created_at: str
+    message_counter: int = 0
+    messages: list = None
+
+    def __post_init__(self):
+        """Initialize the messages list if not set."""
+        if self.messages is None:
+            self.messages = []
 
     def to_dict(self) -> Dict:
         """Convert room to dictionary for serialization."""
@@ -194,3 +203,66 @@ class RoomStateManager:
     def get_room_count(self) -> int:
         """Get the total number of rooms on this node."""
         return len(self._rooms)
+
+    def add_message(
+        self, room_id: str, username: str, content: str, max_messages: int = 100
+    ) -> Optional[Dict]:
+        """
+        Add a message to a room and assign a sequence number.
+
+        This method is used by the administrator node to process messages.
+        It assigns a sequence number, generates a message_id and timestamp,
+        and stores the message in the room's message buffer.
+
+        Args:
+            room_id: The room ID
+            username: The username of the sender
+            content: The message content
+            max_messages: Maximum number of messages to keep in buffer
+
+        Returns:
+            dict: Message data with assigned sequence number, or None if failed
+                {
+                    'message_id': str,
+                    'room_id': str,
+                    'username': str,
+                    'content': str,
+                    'sequence_number': int,
+                    'timestamp': str
+                }
+        """
+        room = self._rooms.get(room_id)
+        if not room:
+            logger.warning(f"Cannot add message: Room {room_id} not found")
+            return None
+
+        if username not in room.members:
+            logger.warning(
+                f"Cannot add message: User {username} not in room {room_id}"
+            )
+            return None
+
+        # Assign sequence number
+        room.message_counter += 1
+        seq_num = room.message_counter
+
+        # Create message
+        message = {
+            "message_id": str(uuid.uuid4()),
+            "room_id": room_id,
+            "username": username,
+            "content": content,
+            "sequence_number": seq_num,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Store in buffer (with size limit)
+        room.messages.append(message)
+        if len(room.messages) > max_messages:
+            room.messages.pop(0)
+
+        logger.info(
+            f"Added message #{seq_num} from {username} to room {room_id}"
+        )
+
+        return message

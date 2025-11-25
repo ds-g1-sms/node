@@ -17,6 +17,10 @@ from .protocol import (
     JoinRoomSuccessResponse,
     JoinRoomErrorResponse,
     MemberJoinedNotification,
+    SendMessageRequest,
+    MessageSentConfirmation,
+    NewMessageNotification,
+    MessageErrorResponse,
 )
 
 __all__ = [
@@ -30,4 +34,8 @@ __all__ = [
     "JoinRoomSuccessResponse",
     "JoinRoomErrorResponse",
     "MemberJoinedNotification",
+    "SendMessageRequest",
+    "MessageSentConfirmation",
+    "NewMessageNotification",
+    "MessageErrorResponse",
 ]

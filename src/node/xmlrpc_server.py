@@ -67,6 +67,10 @@ class XMLRPCServer:
         # Register methods
         self.server.register_function(self.get_hosted_rooms, "get_hosted_rooms")
         self.server.register_function(self.join_room, "join_room")
+        self.server.register_function(self.forward_message, "forward_message")
+        self.server.register_function(
+            self.receive_message_broadcast, "receive_message_broadcast"
+        )
 
         logger.info(f"XML-RPC server starting on {self.host}:{self.port}")
 
@@ -208,3 +212,132 @@ class XMLRPCServer:
                 "admin_node": room.admin_node,
             },
         }
+
+    def forward_message(
+        self, room_id: str, username: str, content: str, sender_node_id: str
+    ) -> Dict:
+        """
+        Forward a message to the room administrator for ordering and broadcast.
+
+        This method is exposed via XML-RPC and can be called by peer nodes
+        when a client connected to them wants to send a message to a room
+        hosted here.
+
+        Args:
+            room_id: The ID of the room
+            username: The username of the sender
+            content: The message content
+            sender_node_id: The node the sender is connected to
+
+        Returns:
+            dict: Result with structure:
+            {
+                'success': bool,
+                'message_id': str,
+                'sequence_number': int,
+                'timestamp': str,
+                'error': str or None
+            }
+        """
+        logger.info(
+            f"XML-RPC: forward_message called for room {room_id} "
+            f"from {username} via {sender_node_id}"
+        )
+
+        # Validate message content
+        if not content:
+            return {
+                "success": False,
+                "error": "Message content cannot be empty",
+                "error_code": "INVALID_CONTENT",
+            }
+
+        if len(content) > 5000:
+            return {
+                "success": False,
+                "error": "Message content too long (max 5000 characters)",
+                "error_code": "INVALID_CONTENT",
+            }
+
+        # Get the room
+        room = self.room_manager.get_room(room_id)
+        if not room:
+            logger.warning(f"XML-RPC: Room {room_id} not found")
+            return {
+                "success": False,
+                "error": "Room not found",
+                "error_code": "ROOM_NOT_FOUND",
+            }
+
+        # Check if user is a member
+        if username not in room.members:
+            logger.warning(
+                f"XML-RPC: User {username} not a member of room {room_id}"
+            )
+            return {
+                "success": False,
+                "error": "You are not a member of this room",
+                "error_code": "NOT_MEMBER",
+            }
+
+        # Add message to room (assigns sequence number)
+        message = self.room_manager.add_message(room_id, username, content)
+
+        if not message:
+            return {
+                "success": False,
+                "error": "Failed to add message",
+                "error_code": "INTERNAL_ERROR",
+            }
+
+        # Broadcast to all members via callback
+        if self._broadcast_callback:
+            broadcast_msg = {"type": "new_message", "data": message}
+            self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+
+        logger.info(
+            f"XML-RPC: Message #{message['sequence_number']} "
+            f"from {username} processed"
+        )
+
+        return {
+            "success": True,
+            "message_id": message["message_id"],
+            "sequence_number": message["sequence_number"],
+            "timestamp": message["timestamp"],
+        }
+
+    def receive_message_broadcast(
+        self, room_id: str, message_data: Dict
+    ) -> bool:
+        """
+        Receive a message broadcast from the administrator node.
+
+        This method is exposed via XML-RPC and is called by the administrator
+        node when it broadcasts a message to all member nodes.
+
+        Args:
+            room_id: The ID of the room
+            message_data: Message data containing:
+                - message_id: str
+                - username: str
+                - content: str
+                - sequence_number: int
+                - timestamp: str (ISO format)
+
+        Returns:
+            bool: True if successfully delivered to local clients
+        """
+        logger.info(
+            f"XML-RPC: receive_message_broadcast called for room {room_id}, "
+            f"msg #{message_data.get('sequence_number')}"
+        )
+
+        # Broadcast to local clients via callback
+        if self._broadcast_callback:
+            broadcast_msg = {"type": "new_message", "data": message_data}
+            self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+            return True
+
+        logger.warning("No broadcast callback set for message delivery")
+        return False
