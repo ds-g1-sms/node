@@ -205,7 +205,7 @@ async def test_websocket_join_room_success():
     assert response["data"]["room_id"] == room.room_id
     assert response["data"]["room_name"] == "Test Room"
     assert "alice" in response["data"]["members"]
-    assert response["data"]["member_count"] == 2  # creator + alice
+    assert response["data"]["member_count"] == 1  # just alice (room starts empty)
 
 
 @pytest.mark.asyncio

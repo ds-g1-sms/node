@@ -190,6 +190,8 @@ def test_add_message_to_room():
     room = manager.create_room(
         room_name="Test Room", creator_id="creator"
     )
+    # Add creator as a member
+    manager.add_member(room.room_id, "creator")
 
     # Add a message
     message = manager.add_message(
@@ -212,6 +214,8 @@ def test_add_multiple_messages_increments_sequence():
     room = manager.create_room(
         room_name="Test Room", creator_id="creator"
     )
+    # Add creator as a member
+    manager.add_member(room.room_id, "creator")
 
     msg1 = manager.add_message(room.room_id, "creator", "First")
     msg2 = manager.add_message(room.room_id, "creator", "Second")
@@ -229,6 +233,7 @@ def test_add_message_non_member_fails():
     room = manager.create_room(
         room_name="Test Room", creator_id="creator"
     )
+    # Don't add anyone as a member
 
     # Try to add message as non-member
     message = manager.add_message(room.room_id, "stranger", "Hello!")
@@ -252,6 +257,8 @@ def test_message_buffer_limit():
     room = manager.create_room(
         room_name="Test Room", creator_id="creator"
     )
+    # Add creator as a member
+    manager.add_member(room.room_id, "creator")
 
     # Add more messages than the limit
     for i in range(105):

@@ -591,30 +591,16 @@ class ChatApp(App):
         try:
             status.update("[yellow]Creating room...[/]")
 
-            response = await self.client.create_room(room_name, self.username)
+            await self.client.create_room(room_name, self.username)
 
             # Clear inputs
             name_input.value = ""
             desc_input.value = ""
 
-            status.update(f"[green]Room '{room_name}' created! Joining...[/]")
+            status.update(f"[green]Room '{room_name}' created![/]")
 
-            # After creating, we need to join the room to register our
-            # WebSocket connection with the server for message routing
-            join_response = await self.client.join_room(
-                response.room_id, self.username
-            )
-            self.current_room_id = join_response.room_id
-            self.current_room_name = join_response.room_name
-            self.client.set_current_room(join_response.room_id)
-            self.current_members = list(join_response.members)
-
-            # Switch to chat screen
-            self._show_screen("chat")
-            self._update_chat_screen()
-
-            # Start receiving messages
-            self._start_message_receiver()
+            # Go back to room list and refresh
+            await self._refresh_rooms(global_discovery=True)
 
         except Exception as e:
             logger.error("Failed to create room: %s", e)

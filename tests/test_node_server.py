@@ -40,7 +40,8 @@ def test_create_room():
     assert room.creator_id == "user1"
     assert room.description == "A test room"
     assert room.admin_node == "test_node"
-    assert "user1" in room.members
+    # Room starts with no members
+    assert len(room.members) == 0
     assert manager.get_room_count() == 1
 
 
@@ -84,14 +85,14 @@ def test_list_rooms_with_rooms():
     assert room1_data["room_id"] == room1.room_id
     assert room1_data["room_name"] == "Room 1"
     assert room1_data["description"] == "First room"
-    assert room1_data["member_count"] == 1
+    assert room1_data["member_count"] == 0  # Room starts empty
     assert room1_data["admin_node"] == "test_node"
 
     room2_data = next(r for r in rooms if r["room_name"] == "Room 2")
     assert room2_data["room_id"] == room2.room_id
     assert room2_data["room_name"] == "Room 2"
     assert room2_data["description"] == "Second room"
-    assert room2_data["member_count"] == 1
+    assert room2_data["member_count"] == 0  # Room starts empty
     assert room2_data["admin_node"] == "test_node"
 
 
@@ -134,13 +135,13 @@ def test_add_member():
     manager = RoomStateManager(node_id="test_node")
 
     room = manager.create_room(room_name="Test Room", creator_id="user1")
-    assert len(room.members) == 1
+    assert len(room.members) == 0  # Room starts empty
 
     # Add a member
     result = manager.add_member(room.room_id, "user2")
     assert result is True
     assert "user2" in room.members
-    assert len(room.members) == 2
+    assert len(room.members) == 1
 
     # Try to add member to non-existent room
     result = manager.add_member("invalid_id", "user3")
@@ -152,6 +153,7 @@ def test_remove_member():
     manager = RoomStateManager(node_id="test_node")
 
     room = manager.create_room(room_name="Test Room", creator_id="user1")
+    manager.add_member(room.room_id, "user1")
     manager.add_member(room.room_id, "user2")
     assert len(room.members) == 2
 
@@ -177,6 +179,7 @@ def test_room_to_dict():
     room = manager.create_room(
         room_name="Test Room", creator_id="user1", description="A test room"
     )
+    manager.add_member(room.room_id, "user1")
     manager.add_member(room.room_id, "user2")
 
     room_dict = room.to_dict()
@@ -227,7 +230,7 @@ async def test_websocket_create_room_success():
     assert "room_id" in data
     assert data["room_name"] == "Test Room"
     assert data["admin_node"] == "test_node"
-    assert data["members"] == ["user123"]
+    assert data["members"] == []  # Room starts empty
     assert "created_at" in data
 
     # Verify room was actually created
