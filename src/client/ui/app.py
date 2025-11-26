@@ -484,6 +484,10 @@ class ChatApp(App):
         """Handle disconnection from node."""
         if self._receive_task:
             self._receive_task.cancel()
+            try:
+                await self._receive_task
+            except asyncio.CancelledError:
+                pass
             self._receive_task = None
 
         if self.client:
@@ -649,8 +653,13 @@ class ChatApp(App):
 
     async def _handle_leave_room(self) -> None:
         """Handle leaving the current room."""
+        # Cancel the receive task first and wait for it to complete
         if self._receive_task:
             self._receive_task.cancel()
+            try:
+                await self._receive_task
+            except asyncio.CancelledError:
+                pass
             self._receive_task = None
 
         # Notify server that we're leaving the room
@@ -744,13 +753,14 @@ class ChatApp(App):
 
     def _on_message_received(self, message: Dict[str, Any]) -> None:
         """Callback when a message is ready to display."""
-        self.call_from_thread(self._add_chat_message, message)
+        # Use call_later since this is called from the async event loop
+        self.call_later(lambda m=message: self._add_chat_message(m))
 
     def _on_member_joined(self, data: Dict[str, Any]) -> None:
         """Callback when a member joins the room."""
         username = data.get("username", "Unknown")
         if username != self.username:
-            self.call_from_thread(
+            self.call_later(
                 lambda: self._add_system_message(
                     f"{username} joined the room", "info"
                 )
@@ -758,13 +768,13 @@ class ChatApp(App):
             # Update member list
             if username not in self.current_members:
                 self.current_members.append(username)
-                self.call_from_thread(self._update_chat_screen)
+                self.call_later(self._update_chat_screen)
 
     def _on_ordering_gap(  # pylint: disable=unused-argument
         self, room_id: str
     ) -> None:
         """Callback when a gap is detected in message ordering."""
-        self.call_from_thread(
+        self.call_later(
             lambda: self._add_system_message(
                 "⚠️ Some messages may be out of order", "warning"
             )
