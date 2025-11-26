@@ -201,6 +201,14 @@ class ChatClient(ClientService):
             await self._handle_new_message(data.get("data", {}))
         elif message_type == "member_joined":
             await self._handle_member_joined(data.get("data", {}))
+        elif message_type == "message_sent":
+            # Message confirmation - just log it
+            logger.debug("Message sent confirmation received")
+        elif message_type == "message_error":
+            # Message error - log it and notify
+            error_data = data.get("data", {})
+            error_msg = error_data.get("error", "Unknown error")
+            logger.error("Message send error: %s", error_msg)
         else:
             # Pass through to the original message handler if registered
             if self._message_handler:

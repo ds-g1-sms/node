@@ -125,7 +125,7 @@ class RoomListScreen(Container):
         with Horizontal(id="room-actions"):
             yield Button("Refresh", id="refresh-btn", variant="default")
             yield Button(
-                "Global Discovery", id="global-discover-btn", variant="default"
+                "Local Only", id="local-discover-btn", variant="default"
             )
             yield Button("Create Room", id="create-room-btn", variant="primary")
             yield Button("Disconnect", id="disconnect-btn", variant="warning")
@@ -401,9 +401,9 @@ class ChatApp(App):
         elif button_id == "disconnect-btn":
             await self._handle_disconnect()
         elif button_id == "refresh-btn":
-            await self._refresh_rooms(global_discovery=False)
-        elif button_id == "global-discover-btn":
             await self._refresh_rooms(global_discovery=True)
+        elif button_id == "local-discover-btn":
+            await self._refresh_rooms(global_discovery=False)
         elif button_id == "create-room-btn":
             self._show_screen("create-room")
         elif button_id == "confirm-create-btn":
@@ -473,7 +473,7 @@ class ChatApp(App):
 
             status.update("[green]Connected![/]")
             self._show_screen("room-list")
-            await self._refresh_rooms(global_discovery=False)
+            await self._refresh_rooms(global_discovery=True)
 
         except Exception as e:
             logger.error("Connection failed: %s", e)
@@ -595,15 +595,19 @@ class ChatApp(App):
 
             status.update(f"[green]Room '{room_name}' created![/]")
 
-            # Join the created room
+            # When creating a room, the creator is already a member
+            # So we directly switch to the chat screen
             self.current_room_id = response.room_id
             self.current_room_name = response.room_name
             self.client.set_current_room(response.room_id)
             self.current_members = list(response.members)
 
-            # Switch to room list and refresh
-            self._show_screen("room-list")
-            await self._refresh_rooms(global_discovery=False)
+            # Switch to chat screen directly
+            self._show_screen("chat")
+            self._update_chat_screen()
+
+            # Start receiving messages
+            self._start_message_receiver()
 
         except Exception as e:
             logger.error("Failed to create room: %s", e)
@@ -658,7 +662,7 @@ class ChatApp(App):
         await messages.remove_children()
 
         self._show_screen("room-list")
-        await self._refresh_rooms(global_discovery=False)
+        await self._refresh_rooms(global_discovery=True)
 
     async def _handle_send_message(self) -> None:
         """Handle sending a message."""
@@ -803,4 +807,4 @@ class ChatApp(App):
     def action_refresh_rooms(self) -> None:
         """Handle refresh rooms action."""
         if self._current_screen == "room-list":
-            asyncio.create_task(self._refresh_rooms(global_discovery=False))
+            asyncio.create_task(self._refresh_rooms(global_discovery=True))

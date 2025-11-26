@@ -679,7 +679,7 @@ async def test_client_service_send_message_not_connected():
 
 @pytest.mark.asyncio
 async def test_client_service_send_message_success():
-    """Test that send_message works with mock WebSocket."""
+    """Test that send_message works with mock WebSocket (fire-and-forget)."""
 
     class MockWebSocketClient:
         def __init__(self):
@@ -688,30 +688,16 @@ async def test_client_service_send_message_success():
         async def send(self, message):
             self.sent_messages.append(message)
 
-        async def recv(self):
-            return json.dumps(
-                {
-                    "type": "message_sent",
-                    "data": {
-                        "room_id": "room-123",
-                        "message_id": "msg-456",
-                        "sequence_number": 42,
-                        "timestamp": "2025-11-23T10:30:15Z",
-                    },
-                }
-            )
-
     service = ClientService(node_url="ws://localhost:8000")
     mock_ws = MockWebSocketClient()
     service._set_test_mode(mock_websocket=mock_ws)
 
-    response = await service.send_message(
+    # send_message is now fire-and-forget, returns None
+    result = await service.send_message(
         "room-123", "alice", "Hello everyone!"
     )
 
-    assert response.room_id == "room-123"
-    assert response.message_id == "msg-456"
-    assert response.sequence_number == 42
+    assert result is None  # Fire-and-forget, no return value
 
     # Verify request was sent
     assert len(mock_ws.sent_messages) == 1
@@ -724,7 +710,7 @@ async def test_client_service_send_message_success():
 
 @pytest.mark.asyncio
 async def test_client_service_send_message_error():
-    """Test that send_message raises ValueError on error response."""
+    """Test that send_message works even without recv (fire-and-forget)."""
 
     class MockWebSocketClient:
         def __init__(self):
@@ -733,21 +719,11 @@ async def test_client_service_send_message_error():
         async def send(self, message):
             self.sent_messages.append(message)
 
-        async def recv(self):
-            return json.dumps(
-                {
-                    "type": "message_error",
-                    "data": {
-                        "room_id": "room-123",
-                        "error": "You are not a member of this room",
-                        "error_code": "NOT_MEMBER",
-                    },
-                }
-            )
-
     service = ClientService(node_url="ws://localhost:8000")
     mock_ws = MockWebSocketClient()
     service._set_test_mode(mock_websocket=mock_ws)
 
-    with pytest.raises(ValueError, match="not a member"):
-        await service.send_message("room-123", "alice", "Hello!")
+    # send_message is fire-and-forget, should not raise
+    result = await service.send_message("room-123", "alice", "Hello!")
+    assert result is None
+    assert len(mock_ws.sent_messages) == 1
