@@ -466,6 +466,7 @@ class ChatApp(App):
             # Set up callbacks
             self.client.set_on_message_ready(self._on_message_received)
             self.client.set_on_member_joined(self._on_member_joined)
+            self.client.set_on_member_left(self._on_member_left)
             self.client.set_on_ordering_gap_detected(self._on_ordering_gap)
 
             await self.client.connect()
@@ -754,6 +755,20 @@ class ChatApp(App):
             # Update member list
             if username not in self.current_members:
                 self.current_members.append(username)
+                self.call_later(self._update_chat_screen)
+
+    def _on_member_left(self, data: Dict[str, Any]) -> None:
+        """Callback when a member leaves the room."""
+        username = data.get("username", "Unknown")
+        if username != self.username:
+            self.call_later(
+                lambda: self._add_system_message(
+                    f"{username} left the room", "info"
+                )
+            )
+            # Update member list
+            if username in self.current_members:
+                self.current_members.remove(username)
                 self.call_later(self._update_chat_screen)
 
     def _on_ordering_gap(  # pylint: disable=unused-argument
