@@ -215,6 +215,7 @@ class XMLRPCServer:
                 "member_count": len(room.members),
                 "admin_node": room.admin_node,
             },
+            "messages": room.messages,  # Include existing messages for late joiners
         }
 
     def forward_message(

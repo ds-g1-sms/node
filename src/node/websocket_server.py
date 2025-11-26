@@ -384,16 +384,22 @@ class WebSocketServer:
                 )
 
                 # Send existing messages to the joining user
+                # First try local room (for local joins)
                 room = self.room_manager.get_room(room_id)
-                if room and room.messages:
-                    for message in room.messages:
+                messages = room.messages if room else []
+                # For remote joins, messages are included in the result
+                if not messages and "messages" in result:
+                    messages = result["messages"]
+
+                if messages:
+                    for message in messages:
                         msg_response = {
                             "type": "new_message",
                             "data": message,
                         }
                         await websocket.send(json.dumps(msg_response))
                     logger.info(
-                        f"Sent {len(room.messages)} existing messages "
+                        f"Sent {len(messages)} existing messages "
                         f"to {username}"
                     )
             else:
