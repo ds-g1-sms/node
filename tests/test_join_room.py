@@ -237,7 +237,7 @@ async def test_websocket_join_room_not_found():
 
 @pytest.mark.asyncio
 async def test_websocket_join_room_already_in_room():
-    """Test join_room when user is already in the room."""
+    """Test join_room when user is already in the room allows re-joining."""
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
@@ -263,9 +263,11 @@ async def test_websocket_join_room_already_in_room():
 
     assert len(mock_ws.sent_messages) == 1
 
+    # Users who are already members can re-join (e.g., room creator)
+    # This allows their WebSocket connection to be registered
     response = json.loads(mock_ws.sent_messages[0])
-    assert response["type"] == "join_room_error"
-    assert response["data"]["error_code"] == "ALREADY_IN_ROOM"
+    assert response["type"] == "join_room_success"
+    assert response["data"]["room_id"] == room.room_id
 
 
 @pytest.mark.asyncio

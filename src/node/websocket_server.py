@@ -229,6 +229,8 @@ class WebSocketServer:
                 await self.handle_discover_rooms(websocket, data)
             elif message_type == "join_room":
                 await self.handle_join_room(websocket, data)
+            elif message_type == "leave_room":
+                await self.handle_leave_room(websocket, data)
             elif message_type == "send_message":
                 await self.handle_send_message(websocket, data)
             else:
@@ -418,29 +420,31 @@ class WebSocketServer:
             }
 
         # Check if user is already in the room
-        if username in room.members:
-            return {
-                "success": False,
-                "message": "Already in room",
-                "error_code": "ALREADY_IN_ROOM",
+        already_member = username in room.members
+
+        if not already_member:
+            # Add user to the room
+            self.room_manager.add_member(room_id, username)
+
+            # Broadcast member_joined to existing members
+            broadcast_msg = {
+                "type": "member_joined",
+                "data": {
+                    "room_id": room_id,
+                    "username": username,
+                    "member_count": len(room.members),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
             }
-
-        # Add user to the room
-        self.room_manager.add_member(room_id, username)
-
-        # Broadcast member_joined to existing members
-        broadcast_msg = {
-            "type": "member_joined",
-            "data": {
-                "room_id": room_id,
-                "username": username,
-                "member_count": len(room.members),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        }
-        await self.broadcast_to_room(room_id, broadcast_msg, websocket)
-
-        logger.info(f"User {username} joined local room {room.room_name}")
+            await self.broadcast_to_room(room_id, broadcast_msg, websocket)
+            logger.info(f"User {username} joined local room {room.room_name}")
+        else:
+            # User is already a member (e.g., room creator)
+            # Just log it - we'll register their WebSocket connection below
+            logger.info(
+                f"User {username} re-joining room {room.room_name} "
+                f"(already a member)"
+            )
 
         return {
             "success": True,
@@ -552,6 +556,66 @@ class WebSocketServer:
             },
         }
         await websocket.send(json.dumps(response))
+
+    async def handle_leave_room(
+        self, websocket: WebSocketServerProtocol, data: dict
+    ):
+        """
+        Handle a leave_room request.
+
+        Args:
+            websocket: The WebSocket connection
+            data: The request data
+        """
+        try:
+            # Extract parameters
+            request_data = data.get("data", {})
+            room_id = request_data.get("room_id")
+            username = request_data.get("username")
+
+            if not room_id or not username:
+                await self.send_error(websocket, "Missing room_id or username")
+                return
+
+            logger.info(
+                f"Processing leave_room request: "
+                f"room {room_id} by {username}"
+            )
+
+            # Remove client from room membership tracking
+            self.unregister_client_room_membership(websocket, room_id)
+
+            # Remove member from room state
+            room = self.room_manager.get_room(room_id)
+            if room:
+                self.room_manager.remove_member(room_id, username)
+
+                # Broadcast member_left to remaining members
+                broadcast_msg = {
+                    "type": "member_left",
+                    "data": {
+                        "room_id": room_id,
+                        "username": username,
+                        "member_count": len(room.members),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                }
+                await self.broadcast_to_room(room_id, broadcast_msg, websocket)
+
+            # Send success response
+            response = {
+                "type": "leave_room_success",
+                "data": {
+                    "room_id": room_id,
+                    "username": username,
+                },
+            }
+            await websocket.send(json.dumps(response))
+            logger.info(f"User {username} left room {room_id}")
+
+        except Exception as e:
+            logger.error(f"Error processing leave_room: {e}")
+            await self.send_error(websocket, str(e))
 
     async def handle_discover_rooms(
         self, websocket: WebSocketServerProtocol, data: dict

@@ -593,16 +593,19 @@ class ChatApp(App):
             name_input.value = ""
             desc_input.value = ""
 
-            status.update(f"[green]Room '{room_name}' created![/]")
+            status.update(f"[green]Room '{room_name}' created! Joining...[/]")
 
-            # When creating a room, the creator is already a member
-            # So we directly switch to the chat screen
-            self.current_room_id = response.room_id
-            self.current_room_name = response.room_name
-            self.client.set_current_room(response.room_id)
-            self.current_members = list(response.members)
+            # After creating, we need to join the room to register our
+            # WebSocket connection with the server for message routing
+            join_response = await self.client.join_room(
+                response.room_id, self.username
+            )
+            self.current_room_id = join_response.room_id
+            self.current_room_name = join_response.room_name
+            self.client.set_current_room(join_response.room_id)
+            self.current_members = list(join_response.members)
 
-            # Switch to chat screen directly
+            # Switch to chat screen
             self._show_screen("chat")
             self._update_chat_screen()
 
@@ -649,6 +652,15 @@ class ChatApp(App):
         if self._receive_task:
             self._receive_task.cancel()
             self._receive_task = None
+
+        # Notify server that we're leaving the room
+        if self.client and self.current_room_id and self.username:
+            try:
+                await self.client.leave_room(
+                    self.current_room_id, self.username
+                )
+            except Exception as e:
+                logger.warning("Failed to notify server of leave: %s", e)
 
         if self.client:
             self.client.leave_current_room()

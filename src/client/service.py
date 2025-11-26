@@ -326,8 +326,33 @@ class ClientService:
         request = SendMessageRequest(room_id, username, content)
         await self.websocket.send(request.to_json())
 
-    # TODO: Future methods to implement:
-    # - async def leave_room(
-    #       self, room_id: str, user_id: str
-    #   ) -> bool
-    # - async def get_room_info(self, room_id: str) -> RoomInfo
+    async def leave_room(self, room_id: str, username: str) -> None:
+        """
+        Leave a room.
+
+        This is a fire-and-forget operation. The confirmation will
+        come through the message receive loop asynchronously.
+
+        Args:
+            room_id: ID of the room to leave
+            username: Username of the user leaving
+
+        Raises:
+            ConnectionError: If not connected to a node server
+        """
+        if not self.is_connected:
+            raise ConnectionError("Not connected to a node server")
+
+        logger.info(f"Leaving room '{room_id}'")
+
+        # Create and send request (fire-and-forget)
+        request = json.dumps(
+            {
+                "type": "leave_room",
+                "data": {
+                    "room_id": room_id,
+                    "username": username,
+                },
+            }
+        )
+        await self.websocket.send(request)
