@@ -179,16 +179,25 @@ class XMLRPCServer:
                 "room_info": None,
             }
 
-        # Check if user is already in the room
+        # Check if user is already in the room - allow re-registration
         if username in room.members:
-            logger.warning(
-                f"XML-RPC: User {username} already in room {room_id}"
+            logger.info(
+                f"XML-RPC: User {username} already in room {room_id}, "
+                "allowing re-registration"
             )
+            # Return success without re-broadcasting join event
             return {
-                "success": False,
-                "message": "Already in room",
-                "error_code": "ALREADY_IN_ROOM",
-                "room_info": None,
+                "success": True,
+                "message": "Already in room, re-registered",
+                "room_info": {
+                    "room_id": room.room_id,
+                    "room_name": room.room_name,
+                    "description": room.description,
+                    "members": list(room.members),
+                    "member_count": len(room.members),
+                    "admin_node": room.admin_node,
+                },
+                "messages": room.messages,
             }
 
         # Add user to the room

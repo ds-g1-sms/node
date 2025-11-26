@@ -403,8 +403,11 @@ def test_xmlrpc_join_room_already_in_room():
 
     result = server.join_room(room.room_id, "alice", "client_node")
 
-    assert result["success"] is False
-    assert result["error_code"] == "ALREADY_IN_ROOM"
+    # Already in room now returns success for re-registration
+    assert result["success"] is True
+    assert result["message"] == "Already in room, re-registered"
+    assert result["room_info"] is not None
+    assert result["room_info"]["room_id"] == room.room_id
 
 
 # Client Service Tests
