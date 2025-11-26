@@ -71,9 +71,14 @@ class XMLRPCServer:
         # Register methods
         self.server.register_function(self.get_hosted_rooms, "get_hosted_rooms")
         self.server.register_function(self.join_room, "join_room")
+        self.server.register_function(self.leave_room, "leave_room")
         self.server.register_function(self.forward_message, "forward_message")
         self.server.register_function(
             self.receive_message_broadcast, "receive_message_broadcast"
+        )
+        self.server.register_function(
+            self.receive_member_event_broadcast,
+            "receive_member_event_broadcast",
         )
 
         logger.info(f"XML-RPC server starting on {self.host}:{self.port}")
