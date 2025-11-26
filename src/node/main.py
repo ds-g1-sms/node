@@ -55,7 +55,7 @@ async def run_server(
 
     # Initialize XML-RPC server
     xmlrpc_server = XMLRPCServer(
-        room_manager, xmlrpc_host, xmlrpc_port, xmlrpc_address
+        room_manager, xmlrpc_host, xmlrpc_port, xmlrpc_address, peer_registry
     )
 
     # Initialize WebSocket server

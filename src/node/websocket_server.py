@@ -382,6 +382,20 @@ class WebSocketServer:
                 logger.info(
                     f"User {username} successfully joined room {room_id}"
                 )
+
+                # Send existing messages to the joining user
+                room = self.room_manager.get_room(room_id)
+                if room and room.messages:
+                    for message in room.messages:
+                        msg_response = {
+                            "type": "new_message",
+                            "data": message,
+                        }
+                        await websocket.send(json.dumps(msg_response))
+                    logger.info(
+                        f"Sent {len(room.messages)} existing messages "
+                        f"to {username}"
+                    )
             else:
                 await self.send_join_error(
                     websocket,

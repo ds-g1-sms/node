@@ -7,6 +7,7 @@ Handles XML-RPC requests from peer nodes for distributed operations.
 import logging
 from datetime import datetime, timezone
 from xmlrpc.server import SimpleXMLRPCServer
+from xmlrpc.client import ServerProxy
 from threading import Thread
 from typing import List, Dict, Callable, Optional
 
@@ -29,6 +30,7 @@ class XMLRPCServer:
         host: str,
         port: int,
         node_address: str,
+        peer_registry=None,
     ):
         """
         Initialize the XML-RPC server.
@@ -38,6 +40,7 @@ class XMLRPCServer:
             host: Host address to bind to
             port: Port to listen on
             node_address: Full address of this node (e.g., "http://localhost:9090")
+            peer_registry: Optional registry of peer nodes for broadcasting
         """
         self.room_manager = room_manager
         self.host = host
@@ -46,6 +49,7 @@ class XMLRPCServer:
         self.server = None
         self.server_thread = None
         self._broadcast_callback: Optional[Callable] = None
+        self.peer_registry = peer_registry
 
     def set_broadcast_callback(self, callback: Callable):
         """
@@ -290,10 +294,22 @@ class XMLRPCServer:
                 "error_code": "INTERNAL_ERROR",
             }
 
-        # Broadcast to all members via callback
+        # Broadcast to local clients via callback
         if self._broadcast_callback:
             broadcast_msg = {"type": "new_message", "data": message}
             self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+
+        # Broadcast to peer nodes via XML-RPC
+        if self.peer_registry:
+            peers = self.peer_registry.list_peers()
+            for peer_node_id, peer_addr in peers.items():
+                try:
+                    proxy = ServerProxy(peer_addr, allow_none=True)
+                    proxy.receive_message_broadcast(room_id, message)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to broadcast message to {peer_node_id}: {e}"
+                    )
 
         logger.info(
             f"XML-RPC: Message #{message['sequence_number']} "
