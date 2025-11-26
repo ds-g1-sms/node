@@ -191,18 +191,35 @@ class XMLRPCServer:
 
         logger.info(f"XML-RPC: User {username} joined room {room.room_name}")
 
-        # Broadcast member_joined to existing members via callback
+        # Create member_joined event data
+        event_data = {
+            "room_id": room_id,
+            "username": username,
+            "member_count": len(room.members),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Broadcast member_joined to local clients via callback
         if self._broadcast_callback:
             broadcast_msg = {
                 "type": "member_joined",
-                "data": {
-                    "room_id": room_id,
-                    "username": username,
-                    "member_count": len(room.members),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                },
+                "data": event_data,
             }
             self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+
+        # Broadcast member_joined to peer nodes via XML-RPC
+        if self.peer_registry:
+            peers = self.peer_registry.list_peers()
+            for peer_node_id, peer_addr in peers.items():
+                try:
+                    proxy = ServerProxy(peer_addr, allow_none=True)
+                    proxy.receive_member_event_broadcast(
+                        room_id, "member_joined", event_data
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to broadcast member_joined to {peer_node_id}: {e}"
+                    )
 
         return {
             "success": True,
@@ -358,3 +375,115 @@ class XMLRPCServer:
 
         logger.warning("No broadcast callback set for message delivery")
         return False
+
+    def receive_member_event_broadcast(
+        self, room_id: str, event_type: str, event_data: Dict
+    ) -> bool:
+        """
+        Receive a member event broadcast (join/leave) from the administrator node.
+
+        This method is exposed via XML-RPC and is called by the administrator
+        node when it broadcasts member join/leave events to all member nodes.
+
+        Args:
+            room_id: The ID of the room
+            event_type: Type of event ("member_joined" or "member_left")
+            event_data: Event data containing username, member_count, timestamp
+
+        Returns:
+            bool: True if successfully delivered to local clients
+        """
+        logger.info(
+            f"XML-RPC: receive_member_event_broadcast called for room {room_id}, "
+            f"event {event_type}, user {event_data.get('username')}"
+        )
+
+        # Broadcast to local clients via callback
+        if self._broadcast_callback:
+            broadcast_msg = {"type": event_type, "data": event_data}
+            self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+            return True
+
+        logger.warning("No broadcast callback set for member event delivery")
+        return False
+
+    def leave_room(
+        self, room_id: str, username: str, client_node_id: str
+    ) -> Dict:
+        """
+        Handle a leave request for a room administered by this node.
+
+        This method is exposed via XML-RPC and can be called by peer nodes
+        when a client connected to them wants to leave a room hosted here.
+
+        Args:
+            room_id: The ID of the room to leave
+            username: The username of the leaving user
+            client_node_id: The node the client is connected to
+
+        Returns:
+            dict: Leave result with success status
+        """
+        logger.info(
+            f"XML-RPC: leave_room called for room {room_id} "
+            f"by {username} from {client_node_id}"
+        )
+
+        # Get the room
+        room = self.room_manager.get_room(room_id)
+        if not room:
+            logger.warning(f"XML-RPC: Room {room_id} not found")
+            return {
+                "success": False,
+                "message": "Room not found",
+                "error_code": "ROOM_NOT_FOUND",
+            }
+
+        # Check if user is in the room
+        if username not in room.members:
+            logger.warning(f"XML-RPC: User {username} not in room {room_id}")
+            return {
+                "success": False,
+                "message": "Not in room",
+                "error_code": "NOT_IN_ROOM",
+            }
+
+        # Remove user from the room
+        self.room_manager.remove_member(room_id, username)
+
+        logger.info(f"XML-RPC: User {username} left room {room.room_name}")
+
+        # Create member_left event data
+        event_data = {
+            "room_id": room_id,
+            "username": username,
+            "member_count": len(room.members),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Broadcast member_left to local clients via callback
+        if self._broadcast_callback:
+            broadcast_msg = {
+                "type": "member_left",
+                "data": event_data,
+            }
+            self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+
+        # Broadcast member_left to peer nodes via XML-RPC
+        if self.peer_registry:
+            peers = self.peer_registry.list_peers()
+            for peer_node_id, peer_addr in peers.items():
+                try:
+                    proxy = ServerProxy(peer_addr, allow_none=True)
+                    proxy.receive_member_event_broadcast(
+                        room_id, "member_left", event_data
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to broadcast member_left to {peer_node_id}: {e}"
+                    )
+
+        return {
+            "success": True,
+            "message": "Successfully left room",
+        }

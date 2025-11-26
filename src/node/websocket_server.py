@@ -458,6 +458,21 @@ class WebSocketServer:
             }
             await self.broadcast_to_room(room_id, broadcast_msg, websocket)
             logger.info(f"User {username} joined local room {room.room_name}")
+
+            # Also broadcast to peer nodes
+            if self.peer_registry:
+                peers = self.peer_registry.list_peers()
+                for peer_node_id, peer_addr in peers.items():
+                    try:
+                        proxy = ServerProxy(peer_addr, allow_none=True)
+                        proxy.receive_member_event_broadcast(
+                            room_id, "member_joined", broadcast_msg["data"]
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to broadcast member_joined "
+                            f"to {peer_node_id}: {e}"
+                        )
         else:
             # User is already a member (e.g., room creator)
             # Just log it - we'll register their WebSocket connection below
@@ -605,12 +620,13 @@ class WebSocketServer:
             # Remove client from room membership tracking
             self.unregister_client_room_membership(websocket, room_id)
 
-            # Remove member from room state
+            # Check if this is a local or remote room
             room = self.room_manager.get_room(room_id)
             if room:
+                # Local room - handle directly
                 self.room_manager.remove_member(room_id, username)
 
-                # Broadcast member_left to remaining members
+                # Broadcast member_left to remaining local members
                 broadcast_msg = {
                     "type": "member_left",
                     "data": {
@@ -621,6 +637,24 @@ class WebSocketServer:
                     },
                 }
                 await self.broadcast_to_room(room_id, broadcast_msg, websocket)
+
+                # Also broadcast to peer nodes
+                if self.peer_registry:
+                    peers = self.peer_registry.list_peers()
+                    for peer_node_id, peer_addr in peers.items():
+                        try:
+                            proxy = ServerProxy(peer_addr, allow_none=True)
+                            proxy.receive_member_event_broadcast(
+                                room_id, "member_left", broadcast_msg["data"]
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to broadcast member_left "
+                                f"to {peer_node_id}: {e}"
+                            )
+            else:
+                # Remote room - call XML-RPC on the admin node
+                await self._handle_remote_leave(room_id, username)
 
             # Send success response
             response = {
@@ -636,6 +670,51 @@ class WebSocketServer:
         except Exception as e:
             logger.error(f"Error processing leave_room: {e}")
             await self.send_error(websocket, str(e))
+
+    async def _handle_remote_leave(self, room_id: str, username: str):
+        """
+        Handle leaving a remote room by calling XML-RPC on the admin node.
+
+        Args:
+            room_id: The room ID
+            username: The username
+        """
+        if not self.peer_registry:
+            return
+
+        # Discover rooms to find the admin node
+        local_rooms = self.room_manager.list_rooms()
+        discovery_result = self.peer_registry.discover_global_rooms(local_rooms)
+
+        # Find the room in the discovered rooms
+        target_room = None
+        for room in discovery_result.get("rooms", []):
+            if room.get("room_id") == room_id:
+                target_room = room
+                break
+
+        if not target_room:
+            logger.warning(f"Could not find admin node for room {room_id}")
+            return
+
+        # Get the admin node address
+        node_address = target_room.get("node_address")
+        if not node_address:
+            admin_node = target_room.get("admin_node")
+            node_address = self.peer_registry.get_peer_address(admin_node)
+
+        if not node_address:
+            logger.warning(
+                f"Could not get address for admin node of room {room_id}"
+            )
+            return
+
+        # Call XML-RPC to leave the room
+        try:
+            proxy = ServerProxy(node_address, allow_none=True)
+            proxy.leave_room(room_id, username, self.room_manager.node_id)
+        except Exception as e:
+            logger.error(f"Failed to leave remote room: {e}")
 
     async def handle_discover_rooms(
         self, websocket: WebSocketServerProtocol, data: dict
