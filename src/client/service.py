@@ -282,23 +282,32 @@ class ClientService:
         request = JoinRoomRequest(room_id, username)
         await self.websocket.send(request.to_json())
 
-        # Receive response
-        response_json = await self.websocket.recv()
-        response_data = json.loads(response_json)
+        # Receive response - loop until we get a join-related response
+        # Other messages (like member_left broadcasts) may be pending
+        max_attempts = 10
+        for _ in range(max_attempts):
+            response_json = await self.websocket.recv()
+            response_data = json.loads(response_json)
+            response_type = response_data.get("type")
 
-        # Check response type
-        if response_data.get("type") == "join_room_success":
-            response = JoinRoomSuccessResponse.from_json(response_json)
-            logger.info(f"Successfully joined room '{response.room_name}'")
-            return response
-        elif response_data.get("type") == "join_room_error":
-            error_data = response_data.get("data", {})
-            error_msg = error_data.get("error", "Unknown error")
-            logger.error(f"Failed to join room: {error_msg}")
-            raise ValueError(error_msg)
-        else:
-            logger.error(f"Unexpected response type: {response_data}")
-            raise ValueError("Unexpected response from server")
+            # Check response type
+            if response_type == "join_room_success":
+                response = JoinRoomSuccessResponse.from_json(response_json)
+                logger.info(f"Successfully joined room '{response.room_name}'")
+                return response
+            elif response_type == "join_room_error":
+                error_data = response_data.get("data", {})
+                error_msg = error_data.get("error", "Unknown error")
+                logger.error(f"Failed to join room: {error_msg}")
+                raise ValueError(error_msg)
+            else:
+                # Skip non-join responses (e.g., pending broadcasts)
+                logger.debug(
+                    f"Skipping non-join response while joining: {response_type}"
+                )
+
+        logger.error("Timed out waiting for join response")
+        raise ValueError("Timed out waiting for join response")
 
     async def send_message(
         self, room_id: str, username: str, content: str
