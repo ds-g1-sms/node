@@ -18,6 +18,7 @@ from .schemas import (
     # Base classes
     BaseRequest,
     BaseResponse,
+    BaseErrorResponse,
     # Room schemas
     CreateRoomRequest,
     RoomCreatedResponse,
@@ -44,6 +45,7 @@ __all__ = [
     # Base schema classes
     "BaseRequest",
     "BaseResponse",
+    "BaseErrorResponse",
     # Room schemas
     "CreateRoomRequest",
     "RoomCreatedResponse",

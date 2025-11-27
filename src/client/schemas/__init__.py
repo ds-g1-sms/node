@@ -4,11 +4,11 @@ Schemas Package
 This package contains protocol message schemas for client-server communication.
 Schemas are organized by category: room, member, and message operations.
 
-The package provides base classes (BaseRequest, BaseResponse) that eliminate
-code duplication for serialization and deserialization methods.
+The package provides base classes (BaseRequest, BaseResponse, BaseErrorResponse)
+that eliminate code duplication for serialization and deserialization methods.
 """
 
-from .base import BaseRequest, BaseResponse
+from .base import BaseRequest, BaseResponse, BaseErrorResponse
 from .room import (
     CreateRoomRequest,
     RoomCreatedResponse,
@@ -33,6 +33,7 @@ __all__ = [
     # Base classes
     "BaseRequest",
     "BaseResponse",
+    "BaseErrorResponse",
     # Room schemas
     "CreateRoomRequest",
     "RoomCreatedResponse",

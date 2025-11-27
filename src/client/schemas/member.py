@@ -8,7 +8,7 @@ including joining, leaving, and member notifications.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from .base import BaseRequest, BaseResponse
+from .base import BaseErrorResponse, BaseRequest, BaseResponse
 
 
 @dataclass
@@ -65,28 +65,13 @@ class JoinRoomSuccessResponse(BaseResponse):
 
 
 @dataclass
-class JoinRoomErrorResponse(BaseResponse):
+class JoinRoomErrorResponse(BaseErrorResponse):
     """
     Response indicating failed room join.
 
-    Attributes:
-        room_id: ID of the room that was requested
-        error: Error message
-        error_code: Error code (e.g., ROOM_NOT_FOUND, ALREADY_IN_ROOM)
+    Inherits room_id, error, and error_code from BaseErrorResponse.
+    Common error codes: ROOM_NOT_FOUND, ALREADY_IN_ROOM
     """
-
-    room_id: str
-    error: str
-    error_code: str
-
-    @classmethod
-    def _from_data(cls, data: Dict[str, Any]) -> "JoinRoomErrorResponse":
-        """Create from response data dictionary."""
-        return cls(
-            room_id=data["room_id"],
-            error=data["error"],
-            error_code=data["error_code"],
-        )
 
 
 @dataclass

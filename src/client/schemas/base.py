@@ -6,7 +6,7 @@ common serialization and deserialization methods to avoid code duplication.
 """
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, fields
 from typing import Any, Dict, TypeVar
 
 T = TypeVar("T", bound="BaseResponse")
@@ -25,9 +25,13 @@ class BaseRequest:
         Convert to dictionary for JSON serialization.
 
         Returns:
-            Dictionary with 'type' and 'data' keys.
+            Dictionary with 'type' key and optional 'data' key.
+            If the request has no fields, only 'type' is included.
         """
-        return {"type": self._message_type, "data": asdict(self)}
+        # Check if the dataclass has any fields
+        if hasattr(self, "__dataclass_fields__") and fields(self):
+            return {"type": self._message_type, "data": asdict(self)}
+        return {"type": self._message_type}
 
     def to_json(self) -> str:
         """
@@ -98,3 +102,22 @@ class BaseResponse:
             Instance of the response class.
         """
         return cls(**data)
+
+
+@dataclass
+class BaseErrorResponse(BaseResponse):
+    """
+    Base class for error response schemas.
+
+    Provides common structure for error responses with room_id, error message,
+    and error code.
+
+    Attributes:
+        room_id: ID of the room related to the error
+        error: Error message
+        error_code: Error code (e.g., ROOM_NOT_FOUND, NOT_MEMBER)
+    """
+
+    room_id: str
+    error: str
+    error_code: str

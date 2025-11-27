@@ -55,6 +55,10 @@ class RoomInfo:
     """
     Information about a chat room.
 
+    Note: This is a data transfer object used within RoomsListResponse,
+    not a standalone response that needs deserialization methods.
+    Room dictionaries are deserialized in RoomsListResponse._from_data().
+
     Attributes:
         room_id: Unique identifier for the room
         room_name: Name of the room
@@ -76,16 +80,13 @@ class ListRoomsRequest(BaseRequest):
     Request to list all rooms on a node.
 
     This is a simple request with no additional parameters.
+    The base class to_dict() handles empty requests automatically.
     """
 
     @property
     def _message_type(self) -> str:
         """Return the message type for list rooms requests."""
         return "list_rooms"
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return {"type": self._message_type}
 
 
 @dataclass

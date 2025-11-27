@@ -8,7 +8,7 @@ including sending messages and receiving message notifications.
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from .base import BaseRequest, BaseResponse
+from .base import BaseErrorResponse, BaseRequest, BaseResponse
 
 
 @dataclass
@@ -95,25 +95,10 @@ class NewMessageNotification(BaseResponse):
 
 
 @dataclass
-class MessageErrorResponse(BaseResponse):
+class MessageErrorResponse(BaseErrorResponse):
     """
     Response indicating failed message send.
 
-    Attributes:
-        room_id: ID of the room
-        error: Error message
-        error_code: Error code (e.g., NOT_MEMBER, INVALID_CONTENT)
+    Inherits room_id, error, and error_code from BaseErrorResponse.
+    Common error codes: NOT_MEMBER, INVALID_CONTENT
     """
-
-    room_id: str
-    error: str
-    error_code: str
-
-    @classmethod
-    def _from_data(cls, data: Dict[str, Any]) -> "MessageErrorResponse":
-        """Create from response data dictionary."""
-        return cls(
-            room_id=data["room_id"],
-            error=data["error"],
-            error_code=data["error_code"],
-        )
