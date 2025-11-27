@@ -2,11 +2,13 @@
 Client Package
 
 This package provides the client-side functionality for the distributed
-chat system, including the ClientService for connecting to nodes and
-protocol message definitions.
+chat system, including the ClientService for connecting to nodes,
+protocol message definitions, and the terminal user interface.
 """
 
 from .service import ClientService
+from .message_buffer import MessageBuffer
+from .chat_client import ChatClient
 from .protocol import (
     CreateRoomRequest,
     RoomCreatedResponse,
@@ -17,10 +19,16 @@ from .protocol import (
     JoinRoomSuccessResponse,
     JoinRoomErrorResponse,
     MemberJoinedNotification,
+    SendMessageRequest,
+    MessageSentConfirmation,
+    NewMessageNotification,
+    MessageErrorResponse,
 )
 
 __all__ = [
     "ClientService",
+    "MessageBuffer",
+    "ChatClient",
     "CreateRoomRequest",
     "RoomCreatedResponse",
     "ListRoomsRequest",
@@ -30,4 +38,8 @@ __all__ = [
     "JoinRoomSuccessResponse",
     "JoinRoomErrorResponse",
     "MemberJoinedNotification",
+    "SendMessageRequest",
+    "MessageSentConfirmation",
+    "NewMessageNotification",
+    "MessageErrorResponse",
 ]

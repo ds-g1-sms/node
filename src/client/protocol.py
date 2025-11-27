@@ -280,7 +280,133 @@ class MemberJoinedNotification:
         return cls.from_dict(data)
 
 
-# TODO: Add more message types as needed:
-# - SendMessageRequest
-# - MessageReceivedNotification
-# - LeaveRoomRequest
+@dataclass
+class SendMessageRequest:
+    """
+    Request to send a message to a room.
+
+    Attributes:
+        room_id: ID of the room to send the message to
+        username: Username of the sender
+        content: The message content
+    """
+
+    room_id: str
+    username: str
+    content: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {"type": "send_message", "data": asdict(self)}
+
+    def to_json(self) -> str:
+        """Convert to JSON string."""
+        return json.dumps(self.to_dict())
+
+
+@dataclass
+class MessageSentConfirmation:
+    """
+    Confirmation that a message was successfully sent.
+
+    Attributes:
+        room_id: ID of the room
+        message_id: Unique identifier for the message
+        sequence_number: Assigned sequence number for ordering
+        timestamp: ISO 8601 timestamp of when message was processed
+    """
+
+    room_id: str
+    message_id: str
+    sequence_number: int
+    timestamp: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MessageSentConfirmation":
+        """Create from dictionary."""
+        response_data = data.get("data", data)
+        return cls(
+            room_id=response_data["room_id"],
+            message_id=response_data["message_id"],
+            sequence_number=response_data["sequence_number"],
+            timestamp=response_data["timestamp"],
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "MessageSentConfirmation":
+        """Create from JSON string."""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+
+@dataclass
+class NewMessageNotification:
+    """
+    Notification of a new message in a room.
+
+    Attributes:
+        room_id: ID of the room
+        message_id: Unique identifier for the message
+        username: Username of the sender
+        content: The message content
+        sequence_number: Sequence number for ordering
+        timestamp: ISO 8601 timestamp of when message was processed
+    """
+
+    room_id: str
+    message_id: str
+    username: str
+    content: str
+    sequence_number: int
+    timestamp: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "NewMessageNotification":
+        """Create from dictionary."""
+        response_data = data.get("data", data)
+        return cls(
+            room_id=response_data["room_id"],
+            message_id=response_data["message_id"],
+            username=response_data["username"],
+            content=response_data["content"],
+            sequence_number=response_data["sequence_number"],
+            timestamp=response_data["timestamp"],
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "NewMessageNotification":
+        """Create from JSON string."""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+
+@dataclass
+class MessageErrorResponse:
+    """
+    Response indicating failed message send.
+
+    Attributes:
+        room_id: ID of the room
+        error: Error message
+        error_code: Error code (e.g., NOT_MEMBER, INVALID_CONTENT)
+    """
+
+    room_id: str
+    error: str
+    error_code: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MessageErrorResponse":
+        """Create from dictionary."""
+        response_data = data.get("data", data)
+        return cls(
+            room_id=response_data["room_id"],
+            error=response_data["error"],
+            error_code=response_data["error_code"],
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "MessageErrorResponse":
+        """Create from JSON string."""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
