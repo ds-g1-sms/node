@@ -78,6 +78,7 @@ class ChatClient(ClientService):
         self._on_member_joined: Optional[Callable[[Dict[str, Any]], None]] = (
             None
         )
+        self._on_member_left: Optional[Callable[[Dict[str, Any]], None]] = None
 
         logger.info("ChatClient initialized for node: %s", node_url)
 
@@ -158,6 +159,17 @@ class ChatClient(ClientService):
         """
         self._on_member_joined = callback
 
+    def set_on_member_left(
+        self, callback: Callable[[Dict[str, Any]], None]
+    ) -> None:
+        """
+        Register callback for member left notifications.
+
+        Args:
+            callback: Function that receives member info dict
+        """
+        self._on_member_left = callback
+
     async def receive_messages(self) -> None:
         """
         Continuously receive and process messages from the server.
@@ -201,6 +213,16 @@ class ChatClient(ClientService):
             await self._handle_new_message(data.get("data", {}))
         elif message_type == "member_joined":
             await self._handle_member_joined(data.get("data", {}))
+        elif message_type == "member_left":
+            await self._handle_member_left(data.get("data", {}))
+        elif message_type == "message_sent":
+            # Message confirmation - just log it
+            logger.debug("Message sent confirmation received")
+        elif message_type == "message_error":
+            # Message error - log it and notify
+            error_data = data.get("data", {})
+            error_msg = error_data.get("error", "Unknown error")
+            logger.error("Message send error: %s", error_msg)
         else:
             # Pass through to the original message handler if registered
             if self._message_handler:
@@ -290,6 +312,32 @@ class ChatClient(ClientService):
 
         logger.info(
             "Member %s joined room %s",
+            member_data.get("username"),
+            room_id,
+        )
+
+    async def _handle_member_left(self, member_data: Dict[str, Any]) -> None:
+        """
+        Handle member_left notification.
+
+        Args:
+            member_data: Member data dictionary containing:
+                - room_id
+                - username
+                - member_count
+                - timestamp
+        """
+        room_id = member_data.get("room_id")
+
+        # Only notify if we're in this room
+        if room_id != self.current_room:
+            return
+
+        if self._on_member_left:
+            self._on_member_left(member_data)
+
+        logger.info(
+            "Member %s left room %s",
             member_data.get("username"),
             room_id,
         )

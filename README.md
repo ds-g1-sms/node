@@ -17,54 +17,96 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 - **Administrator-Based Ordering**: Room creator acts as authority for message ordering
 - **XML-RPC Communication**: Simple server-to-server communication using Python's native XML-RPC
 - **WebSocket Clients**: Real-time bidirectional client-server messaging
+- **Terminal UI**: Rich terminal-based user interface built with Textual
 - **Fault Tolerance**: Basic health checks and failure detection
+
+## Quick Start
+
+### Using Docker (Recommended)
+
+1. **Start the nodes:**
+   ```bash
+   docker compose up -d
+   ```
+   This starts 3 distributed chat nodes accessible at:
+   - Node 1: `localhost:8081`
+   - Node 2: `localhost:8082`
+   - Node 3: `localhost:8083`
+
+2. **Run the chat client locally:**
+   ```bash
+   poetry install
+   poetry run chat-client
+   ```
+
+3. **Connect to a node:**
+   - Enter your username
+   - Enter a node address (e.g., `localhost:8081`)
+   - Click "Connect"
+
+4. **View node logs:**
+   ```bash
+   docker compose logs -f
+   ```
+
+5. **Stop the nodes:**
+   ```bash
+   docker compose down
+   ```
+
+### Running Without Docker
+
+1. **Install dependencies:**
+   ```bash
+   poetry install
+   ```
+
+2. **Start a node server (in one terminal):**
+   ```bash
+   poetry run python -m src.node.main
+   ```
+
+3. **Start the chat client (in another terminal):**
+   ```bash
+   poetry run chat-client
+   ```
+
+4. **Connect to the node:**
+   - Enter your username
+   - Enter `localhost:8080` as the node address
+   - Click "Connect"
 
 ## Project Structure
 
 ```
 .
-├── cmd/
-│   ├── node/           # Node server main entry point
-│   └── client/         # Chat client application
-├── internal/           # Private application code
-│   ├── room/           # Room management
-│   ├── state/          # State management
-│   ├── coordination/   # Two-phase commit coordination
-│   └── handler/        # Request handlers
-├── pkg/                # Public library code
-│   ├── protocol/       # Protocol utilities
-│   └── discovery/      # Node discovery
-├── proto/              # Protocol Buffer definitions
+├── src/
+│   ├── node/           # Node server
+│   │   ├── main.py           # Node entry point
+│   │   ├── room_state.py     # Room management
+│   │   ├── websocket_server.py  # WebSocket server
+│   │   ├── xmlrpc_server.py  # XML-RPC server
+│   │   └── peer_registry.py  # Peer node registry
+│   └── client/         # Chat client
+│       ├── main.py           # Client entry point
+│       ├── chat_client.py    # WebSocket client with message ordering
+│       ├── service.py        # Client service layer
+│       ├── protocol.py       # Message protocols
+│       ├── message_buffer.py # Message ordering buffer
+│       └── ui/               # Terminal UI (Textual)
+├── tests/              # Test files
+├── docs/               # Documentation
 ├── deploy/             # Deployment configurations
-├── scripts/            # Utility scripts
-├── .github/workflows/  # CI/CD workflows
-└── docs/               # Documentation
+└── docker-compose.yml  # Docker Compose for multi-node setup
 ```
 
-## Getting Started
+## Development
 
 ### Prerequisites
 
 - Python 3.8 or later
 - Poetry - Python package manager
-- Make - for using Makefile targets
-- Docker & Docker Compose - for containerized deployment (optional)
-
-### Quick Start with Make
-
-```bash
-# View all available targets
-make help
-
-# Install dependencies
-make deps
-
-# Run node server in development mode
-make dev-node
-
-# Run client in development mode (in another terminal)
-make dev-client
-```
+- Docker & Docker Compose - for multi-node deployment
 
 ### Installing
 
@@ -74,28 +116,6 @@ make install
 
 # Or using Poetry directly
 poetry install
-```
-
-### Running
-
-```bash
-# Start a node server
-poetry run python -m src.node.main
-
-# Start a client
-poetry run python -m src.client.main
-```
-
-## Development
-
-### Dependency Management
-
-```bash
-# Install dependencies
-make deps
-
-# Update dependencies to latest versions
-make deps-update
 ```
 
 ### Testing
@@ -108,42 +128,70 @@ make test
 poetry run pytest -v
 ```
 
-### Linting
+### Linting & Formatting
 
 ```bash
+# Run linters
 make lint
+
+# Format code
+make format
 ```
 
-### Docker Development
+### Docker Commands
 
 ```bash
 # Build Docker images
 make docker-build
 
-# Start all containers (3 nodes + 1 client)
+# Start all nodes
 make docker-up
 
 # View logs
 docker compose logs -f
 
-# Stop containers
+# Stop nodes
 make docker-down
 
 # Clean up (remove containers, volumes, and images)
 make docker-clean
 ```
 
-**Note**: Docker builds use a `requirements.txt` file generated from `pyproject.toml`. If you update dependencies in `pyproject.toml`, update `requirements.txt` accordingly for Docker builds.
+**Note**: Docker builds use a `requirements.txt` file generated from `pyproject.toml`.
 
-For more details on Docker deployment, see [deploy/README.md](deploy/README.md).
+## Chat Client Usage
+
+The chat client provides a terminal-based user interface with the following features:
+
+### Connection Screen
+- Enter your username
+- Enter node address (e.g., `localhost:8081`)
+- Click "Connect" or press Enter
+
+### Room List Screen
+- View available rooms (local or global discovery)
+- Create new rooms
+- Join rooms by clicking on them
+- Refresh the room list
+
+### Chat Screen
+- Send and receive messages
+- View member list
+- See system notifications (joins, leaves, errors)
+- Leave room to return to room list
+
+### Keyboard Shortcuts
+- `q` - Quit the application
+- `Escape` - Go back / Cancel
+- `r` - Refresh room list
 
 ## Technology Stack
 
 - **Language**: Python
-- **Server-to-Server**: XML-RPC (Python's native XML-RPC library)
+- **Server-to-Server**: XML-RPC
 - **Client-to-Server**: WebSockets
-- **State Management**: In-memory (with optional CockroachDB for persistence)
-- **Coordination**: Custom two-phase commit implementation
+- **Terminal UI**: Textual
+- **State Management**: In-memory
 
 ## Contributing
 

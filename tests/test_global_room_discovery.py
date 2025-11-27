@@ -82,7 +82,7 @@ def test_xmlrpc_get_hosted_rooms_with_rooms():
     room1 = next(r for r in rooms if r["room_name"] == "Room 1")
     assert room1["room_name"] == "Room 1"
     assert room1["description"] == "First room"
-    assert room1["member_count"] == 1
+    assert room1["member_count"] == 0  # Room starts empty
     assert room1["admin_node"] == "test_node"
     assert room1["node_address"] == "http://localhost:9090"
 

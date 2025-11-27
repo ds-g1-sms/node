@@ -109,7 +109,7 @@ class RoomStateManager:
             description=description,
             creator_id=creator_id,
             admin_node=self.node_id,
-            members={creator_id},  # Creator is automatically a member
+            members=set(),  # Room starts with no members
             created_at=created_at,
         )
 

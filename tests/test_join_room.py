@@ -205,7 +205,7 @@ async def test_websocket_join_room_success():
     assert response["data"]["room_id"] == room.room_id
     assert response["data"]["room_name"] == "Test Room"
     assert "alice" in response["data"]["members"]
-    assert response["data"]["member_count"] == 2  # creator + alice
+    assert response["data"]["member_count"] == 1  # just alice (room starts empty)
 
 
 @pytest.mark.asyncio
@@ -237,7 +237,7 @@ async def test_websocket_join_room_not_found():
 
 @pytest.mark.asyncio
 async def test_websocket_join_room_already_in_room():
-    """Test join_room when user is already in the room."""
+    """Test join_room when user is already in the room allows re-joining."""
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
@@ -263,9 +263,11 @@ async def test_websocket_join_room_already_in_room():
 
     assert len(mock_ws.sent_messages) == 1
 
+    # Users who are already members can re-join (e.g., room creator)
+    # This allows their WebSocket connection to be registered
     response = json.loads(mock_ws.sent_messages[0])
-    assert response["type"] == "join_room_error"
-    assert response["data"]["error_code"] == "ALREADY_IN_ROOM"
+    assert response["type"] == "join_room_success"
+    assert response["data"]["room_id"] == room.room_id
 
 
 @pytest.mark.asyncio
@@ -401,8 +403,11 @@ def test_xmlrpc_join_room_already_in_room():
 
     result = server.join_room(room.room_id, "alice", "client_node")
 
-    assert result["success"] is False
-    assert result["error_code"] == "ALREADY_IN_ROOM"
+    # Already in room now returns success for re-registration
+    assert result["success"] is True
+    assert result["message"] == "Already in room, re-registered"
+    assert result["room_info"] is not None
+    assert result["room_info"]["room_id"] == room.room_id
 
 
 # Client Service Tests
@@ -546,3 +551,136 @@ def test_unregister_client_room_membership_all_rooms():
         "room-456", set()
     )
     assert mock_ws not in ws_server._client_rooms
+
+
+# Cross-Node Event Tests
+
+
+def test_xmlrpc_receive_member_event_broadcast_join():
+    """Test that XML-RPC receive_member_event_broadcast works for join events."""
+    room_manager = RoomStateManager(node_id="test_node")
+    server = XMLRPCServer(
+        room_manager=room_manager,
+        host="localhost",
+        port=9090,
+        node_address="http://localhost:9090",
+    )
+
+    # Track broadcast calls
+    broadcast_calls = []
+
+    def mock_broadcast(room_id, message, exclude_user=None):
+        broadcast_calls.append((room_id, message, exclude_user))
+
+    server.set_broadcast_callback(mock_broadcast)
+
+    # Call receive_member_event_broadcast
+    event_data = {
+        "room_id": "room-123",
+        "username": "alice",
+        "member_count": 2,
+        "timestamp": "2025-11-26T10:00:00Z",
+    }
+    result = server.receive_member_event_broadcast(
+        "room-123", "member_joined", event_data
+    )
+
+    assert result is True
+    assert len(broadcast_calls) == 1
+    room_id, message, _ = broadcast_calls[0]
+    assert room_id == "room-123"
+    assert message["type"] == "member_joined"
+    assert message["data"]["username"] == "alice"
+
+
+def test_xmlrpc_receive_member_event_broadcast_leave():
+    """Test that XML-RPC receive_member_event_broadcast works for leave events."""
+    room_manager = RoomStateManager(node_id="test_node")
+    server = XMLRPCServer(
+        room_manager=room_manager,
+        host="localhost",
+        port=9090,
+        node_address="http://localhost:9090",
+    )
+
+    # Track broadcast calls
+    broadcast_calls = []
+
+    def mock_broadcast(room_id, message, exclude_user=None):
+        broadcast_calls.append((room_id, message, exclude_user))
+
+    server.set_broadcast_callback(mock_broadcast)
+
+    # Call receive_member_event_broadcast
+    event_data = {
+        "room_id": "room-123",
+        "username": "alice",
+        "member_count": 1,
+        "timestamp": "2025-11-26T10:00:00Z",
+    }
+    result = server.receive_member_event_broadcast(
+        "room-123", "member_left", event_data
+    )
+
+    assert result is True
+    assert len(broadcast_calls) == 1
+    room_id, message, _ = broadcast_calls[0]
+    assert room_id == "room-123"
+    assert message["type"] == "member_left"
+    assert message["data"]["username"] == "alice"
+
+
+def test_xmlrpc_leave_room_success():
+    """Test XML-RPC leave_room method."""
+    room_manager = RoomStateManager(node_id="test_node")
+    server = XMLRPCServer(
+        room_manager=room_manager,
+        host="localhost",
+        port=9090,
+        node_address="http://localhost:9090",
+    )
+
+    # Create a room and add a member
+    room = room_manager.create_room(
+        room_name="Test Room", creator_id="creator"
+    )
+    room_manager.add_member(room.room_id, "alice")
+
+    # Track broadcast calls
+    broadcast_calls = []
+
+    def mock_broadcast(room_id, message, exclude_user=None):
+        broadcast_calls.append((room_id, message, exclude_user))
+
+    server.set_broadcast_callback(mock_broadcast)
+
+    # Call leave_room
+    result = server.leave_room(room.room_id, "alice", "client_node")
+
+    assert result["success"] is True
+    assert "alice" not in room.members
+    assert len(broadcast_calls) == 1
+    _, message, _ = broadcast_calls[0]
+    assert message["type"] == "member_left"
+    assert message["data"]["username"] == "alice"
+
+
+def test_xmlrpc_leave_room_not_in_room():
+    """Test XML-RPC leave_room method when user is not in room."""
+    room_manager = RoomStateManager(node_id="test_node")
+    server = XMLRPCServer(
+        room_manager=room_manager,
+        host="localhost",
+        port=9090,
+        node_address="http://localhost:9090",
+    )
+
+    # Create a room without adding the user
+    room = room_manager.create_room(
+        room_name="Test Room", creator_id="creator"
+    )
+
+    result = server.leave_room(room.room_id, "alice", "client_node")
+
+    assert result["success"] is False
+    assert result["error_code"] == "NOT_IN_ROOM"

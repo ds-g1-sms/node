@@ -55,12 +55,17 @@ async def run_server(
 
     # Initialize XML-RPC server
     xmlrpc_server = XMLRPCServer(
-        room_manager, xmlrpc_host, xmlrpc_port, xmlrpc_address
+        room_manager, xmlrpc_host, xmlrpc_port, xmlrpc_address, peer_registry
     )
-    xmlrpc_server.start()
 
     # Initialize WebSocket server
     ws_server = WebSocketServer(room_manager, ws_host, ws_port, peer_registry)
+
+    # Connect XML-RPC broadcast callback to WebSocket server
+    xmlrpc_server.set_broadcast_callback(ws_server.broadcast_to_room_sync)
+
+    # Start the XML-RPC server
+    xmlrpc_server.start()
 
     # Start the WebSocket server
     await ws_server.start()
