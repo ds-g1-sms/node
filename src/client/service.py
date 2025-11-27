@@ -145,12 +145,27 @@ class ClientService:
         request = CreateRoomRequest(room_name, creator_id)
         await self.websocket.send(request.to_json())
 
-        # Receive response
-        response_json = await self.websocket.recv()
-        response = RoomCreatedResponse.from_json(response_json)
+        # Receive response - loop until we get a room_created response
+        # Other messages (like global_rooms_list) may be pending
+        max_attempts = 10
+        for _ in range(max_attempts):
+            response_json = await self.websocket.recv()
+            response_data = json.loads(response_json)
+            response_type = response_data.get("type")
 
-        logger.info(f"Received room_created response: {response}")
-        return response
+            if response_type == "room_created":
+                response = RoomCreatedResponse.from_json(response_json)
+                logger.info(f"Received room_created response: {response}")
+                return response
+            else:
+                # Skip non-create responses (e.g., pending broadcasts)
+                logger.debug(
+                    f"Skipping non-create response while creating: "
+                    f"{response_type}"
+                )
+
+        logger.error("Timed out waiting for room_created response")
+        raise ValueError("Timed out waiting for room_created response")
 
     async def handle_messages(self) -> None:
         """

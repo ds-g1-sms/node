@@ -566,12 +566,23 @@ class ChatApp(App):
         request = json.dumps({"type": "discover_rooms"})
         await self.client.websocket.send(request)
 
-        # Receive response
-        response_json = await self.client.websocket.recv()
-        response_data = json.loads(response_json)
+        # Receive response - loop until we get the expected response
+        # Other messages may be pending in the buffer
+        max_attempts = 10
+        for _ in range(max_attempts):
+            response_json = await self.client.websocket.recv()
+            response_data = json.loads(response_json)
 
-        if response_data.get("type") == "global_rooms_list":
-            return response_data.get("data", {}).get("rooms", [])
+            if response_data.get("type") == "global_rooms_list":
+                return response_data.get("data", {}).get("rooms", [])
+            else:
+                # Skip non-discovery responses (e.g., pending broadcasts)
+                logger.debug(
+                    "Skipping non-discovery response while refreshing: %s",
+                    response_data.get("type"),
+                )
+
+        logger.warning("Timed out waiting for global_rooms_list response")
         return []
 
     async def _handle_create_room(self) -> None:
