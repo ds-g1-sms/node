@@ -1,32 +1,28 @@
 """
-Protocol Messages for Client-Server Communication
+Schemas Package
 
-This module re-exports schema classes from the schemas package for
-backwards compatibility. New code should import directly from
-the schemas subpackage.
+This package contains protocol message schemas for client-server communication.
+Schemas are organized by category: room, member, and message operations.
 
-Message Format:
-    All messages are JSON objects with the following structure:
-    {
-        "type": "message_type",
-        "data": { ... message-specific data ... }
-    }
+The package provides base classes (BaseRequest, BaseResponse, BaseErrorResponse)
+that eliminate code duplication for serialization and deserialization methods.
 """
 
-# Re-export all schemas for backwards compatibility
-from .schemas import (
-    # Room schemas
+from .base import BaseRequest, BaseResponse, BaseErrorResponse
+from .room import (
     CreateRoomRequest,
     RoomCreatedResponse,
     RoomInfo,
     ListRoomsRequest,
     RoomsListResponse,
-    # Member schemas
+)
+from .member import (
     JoinRoomRequest,
     JoinRoomSuccessResponse,
     JoinRoomErrorResponse,
     MemberJoinedNotification,
-    # Message schemas
+)
+from .message import (
     SendMessageRequest,
     MessageSentConfirmation,
     NewMessageNotification,
@@ -34,15 +30,22 @@ from .schemas import (
 )
 
 __all__ = [
+    # Base classes
+    "BaseRequest",
+    "BaseResponse",
+    "BaseErrorResponse",
+    # Room schemas
     "CreateRoomRequest",
     "RoomCreatedResponse",
     "RoomInfo",
     "ListRoomsRequest",
     "RoomsListResponse",
+    # Member schemas
     "JoinRoomRequest",
     "JoinRoomSuccessResponse",
     "JoinRoomErrorResponse",
     "MemberJoinedNotification",
+    # Message schemas
     "SendMessageRequest",
     "MessageSentConfirmation",
     "NewMessageNotification",
