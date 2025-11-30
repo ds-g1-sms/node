@@ -7,7 +7,7 @@ common serialization and deserialization methods to avoid code duplication.
 
 import json
 from dataclasses import asdict, dataclass, fields
-from typing import Any, Dict, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
 T = TypeVar("T", bound="BaseResponse")
 
@@ -61,7 +61,7 @@ class BaseResponse:
     """
 
     @classmethod
-    def from_dict(cls: type[T], data: Dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
         """
         Create instance from dictionary.
 
@@ -75,7 +75,7 @@ class BaseResponse:
         return cls._from_data(response_data)
 
     @classmethod
-    def from_json(cls: type[T], json_str: str) -> T:
+    def from_json(cls: Type[T], json_str: str) -> T:
         """
         Create instance from JSON string.
 
@@ -89,7 +89,7 @@ class BaseResponse:
         return cls.from_dict(data)
 
     @classmethod
-    def _from_data(cls: type[T], data: Dict[str, Any]) -> T:
+    def _from_data(cls: Type[T], data: Dict[str, Any]) -> T:
         """
         Create instance from response data dictionary.
 
