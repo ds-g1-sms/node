@@ -7,6 +7,7 @@ Handles WebSocket connections from clients and processes their requests.
 import asyncio
 import logging
 import json
+import xmlrpc
 from datetime import datetime, timezone
 from typing import Set, Dict, Optional
 from xmlrpc.client import ServerProxy
@@ -1115,3 +1116,80 @@ class WebSocketServer:
             },
         }
         await websocket.send(json.dumps(response))
+
+    async def handle_client_disconnect(self, websocket: WebSocketServerProtocol, user_id: str):
+        """
+        Handle a client disconnection
+
+        Args:
+            websocket: The WebSocket connection
+            user_id: The user_id of the disconnected user
+
+        """
+        # Get list of user rooms
+        rooms = self._client_rooms.get(websocket, [])
+
+        for room_id in rooms:
+            room = self.room_manager.get_room(room_id)
+
+            # If room is on this node, handle directly
+            if room.to_dict() in self.room_manager.list_rooms():
+                self.room_manager.remove_member(room_id, user_id)
+                self.broadcast_member_left(room_id, user_id, "User disconnected")
+            # Else notify admin node
+            else:
+                admin_node = self.get_room_admin(room_id)
+                try:
+                    proxy = xmlrpc.client.ServerProxy(admin_node['address'])
+                    proxy.notify_member_disconnect(room_id, user_id, self.room_manager.node_id)
+                    proxy.cleanup_stale_members(room_id)
+                except Exception as e:
+                    logger.error(f"Failed to notify admin node of disconnect: {e}")
+
+    def get_room_admin(self, room_id: str):
+        """
+        Get the administrator node info for a given room ID
+        """
+        local_rooms = self.room_manager.list_rooms()
+        discovery_result = self.peer_registry.discover_global_rooms(local_rooms)
+
+        for room in discovery_result.get("rooms", []):
+            if room.get("room_id") == room_id:
+                return {
+                    'node_id': room.get("admin_node"),
+                    'address': room.get("node_address")
+                }
+        return None
+
+    def broadcast_member_left(self, room_id: str, user_id: str, reason: str):
+        """
+        Broadcast a member_left event to local members and peer nodes
+
+        Args:
+            room_id: The room ID
+            user_id: The user_id of the member who left
+            reason: The reason for leaving
+        """
+        room = self.room_manager.get_room(room_id)
+        if not room:
+            return
+
+        # Broadcast to local members
+        broadcast_msg = {
+            "type": "member_left",
+            "data": {
+                "room_id": room_id,
+                "user_id": user_id,
+                "member_count": len(room.members),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "reason": reason,
+            },
+        }
+        asyncio.create_task(
+            self.broadcast_to_room(room_id, broadcast_msg)
+        )
+
+        # Broadcast to peer nodes
+        # Maps room_id -> set of (websocket, username) tuples
+        for websocket, _ in self._room_clients[room_id]:
+            asyncio.create_task(websocket.send(json.dumps(broadcast_msg)))
