@@ -207,6 +207,8 @@ class WebSocketServer:
             self.unregister_client_room_membership(websocket)
             # Unregister client
             self.clients.discard(websocket)
+            # Handle disconnect
+            await self.handle_client_disconnect(websocket)
 
     async def process_message(
         self, websocket: WebSocketServerProtocol, message: str
@@ -1117,34 +1119,52 @@ class WebSocketServer:
         }
         await websocket.send(json.dumps(response))
 
-    async def handle_client_disconnect(self, websocket: WebSocketServerProtocol, user_id: str):
+    async def handle_client_disconnect(self, websocket: WebSocketServerProtocol):
         """
         Handle a client disconnection
 
+        If this node is the admin for a room, remove member locally and broadcast.
+        If not admin, notify the admin node via XML-RPC using notify_member_disconnect().
+
         Args:
             websocket: The WebSocket connection
-            user_id: The user_id of the disconnected user
-
         """
-        # Get list of user rooms
-        rooms = self._client_rooms.get(websocket, [])
+        # Get list of client rooms ids
+        rooms = list(self._client_rooms.get(websocket, []))
 
+        # For each room, remove users (as they disconnected)
         for room_id in rooms:
             room = self.room_manager.get_room(room_id)
+            members = self._room_clients.get(room_id, [])
+            usernames = [u for ws, u in members if ws == websocket]
 
-            # If room is on this node, handle directly
-            if room.to_dict() in self.room_manager.list_rooms():
-                self.room_manager.remove_member(room_id, user_id)
-                self.broadcast_member_left(room_id, user_id, "User disconnected")
-            # Else notify admin node
-            else:
-                admin_node = self.get_room_admin(room_id)
-                try:
-                    proxy = xmlrpc.client.ServerProxy(admin_node['address'])
-                    proxy.notify_member_disconnect(room_id, user_id, self.room_manager.node_id)
-                    proxy.cleanup_stale_members(room_id)
-                except Exception as e:
-                    logger.error(f"Failed to notify admin node of disconnect: {e}")
+            for username in usernames:
+                # Remove client from room membership tracking
+                self.unregister_client_room_membership(websocket, room_id)
+
+                # If room is on this node, handle directly
+                if room_id and room.admin_node == self.room_manager.node_id:
+                    self.room_manager.remove_member(room_id, username)
+                    self.broadcast_member_left(room_id, username, "User disconnected")
+                else:
+                    # Else notify admin node
+                    admin_node = self.get_room_admin(room_id)
+                    if not admin_node:
+                        logger.warning(
+                            f"Could not find admin node for room {room_id} "
+                            f"on disconnect"
+                        )
+                        continue
+                    try:
+                        proxy = xmlrpc.client.ServerProxy(admin_node['address'])
+                        proxy.notify_member_disconnect(room_id, username, self.room_manager.node_id)
+                        proxy.cleanup_stale_members(room_id)
+                    except Exception as e:
+                        logger.error(f"Failed to notify admin node of disconnect: {e}")
+
+        # Remove websocket from client-room map
+        if websocket in self._room_clients:
+            del self._client_rooms[websocket]
 
     def get_room_admin(self, room_id: str):
         """
@@ -1174,7 +1194,7 @@ class WebSocketServer:
         if not room:
             return
 
-        # Broadcast to local members
+        # Message to local members
         broadcast_msg = {
             "type": "member_left",
             "data": {
@@ -1190,6 +1210,6 @@ class WebSocketServer:
         )
 
         # Broadcast to peer nodes
-        # Maps room_id -> set of (websocket, username) tuples
+        # _room_clients maps room_id -> set of (websocket, username) tuples
         for websocket, _ in self._room_clients[room_id]:
             asyncio.create_task(websocket.send(json.dumps(broadcast_msg)))

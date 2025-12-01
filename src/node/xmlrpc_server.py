@@ -5,6 +5,7 @@ Handles XML-RPC requests from peer nodes for distributed operations.
 """
 import asyncio
 import logging
+import socket
 from datetime import datetime, timezone, timedelta
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.client import ServerProxy
@@ -47,6 +48,7 @@ class XMLRPCServer:
         self.host = host
         self.port = port
         self.node_address = node_address
+        # Map of node_id -> {'status', 'consecutive_failures', 'last_active'}
         self.node_health = {}
         self.server = None
         self.server_thread = None
@@ -92,6 +94,8 @@ class XMLRPCServer:
             self.receive_member_event_broadcast,
             "receive_member_event_broadcast",
         )
+        self.server.register_function(self.notify_member_disconnect, "notify_member_disconnect")
+        self.server.register_function(self.heartbeat, "heartbeat")
 
         logger.info(f"XML-RPC server starting on {self.host}:{self.port}")
 
@@ -514,7 +518,7 @@ class XMLRPCServer:
             "message": "Successfully left room",
         }
 
-    def notify_member_disconnect(self, room_id: str, username: str) -> bool:
+    def notify_member_disconnect(self, room_id: str, username: str, member_node_id: str) -> bool:
         """
         Notify the room that a member has disconnected unexpectedly.
 
@@ -531,6 +535,7 @@ class XMLRPCServer:
         logger.info(
             f"XML-RPC: notify_member_disconnect called for room {room_id} "
             f"for user {username}"
+            f"from node {member_node_id}"
         )
 
         # Get the room
@@ -557,25 +562,65 @@ class XMLRPCServer:
             "username": username,
             "member_count": len(room.members),
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "reason": "User disconnected",
         }
 
-        broadcast_member_left()
+        # Broadcast to local clients via callback
+        if self._broadcast_callback:
+            broadcast_msg = {"type": "member_left", "data": event_data}
+            try:
+                self._broadcast_callback(room_id, broadcast_msg)
+            except Exception as e:
+                logger.error("Broadcast failed: {}".format(e))
 
+        # Broadcast to peer nodes via XML-RPC if registry exists
+        if self.peer_registry:
+            peers = self.peer_registry.list_peers()
+            for peer_node_id, peer_addr in peers.items():
+                try:
+                    proxy = ServerProxy(peer_addr, allow_none=True)
+                    proxy.receive_member_event_broadcast(
+                        room_id, "member_left", event_data
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to broadcast member_left to {peer_node_id}: {e}"
+                    )
+
+        logger.info(f"XML-RPC: User {username} removed from room {room.room_name} due to node disconnect")
         return True
 
     async def heartbeat_monitor(self):
         heartbeat_interval = 30  # seconds
         max_failures = 2
+        heartbeat_timeout = 2
 
         while True:
             logger.info("Starting heartbeat check for peer nodes")
-            peers = self.peer_registry.list_peers()
+            # Build list of nodes that currently host members in our rooms:
+            member_nodes = self.peer_registry.list_peers()
 
-            for node_id, node_address in peers.items():
+            for node_id, memberships in member_nodes.items():
+                if node_id == self.room_manager.node_id:
+                    continue
 
+                # Get node address using peer registry
+                node_address = None
+                if self.peer_registry:
+                    node_address = self.peer_registry.get_peer_address(node_id)
+                if not node_address:
+                    logger.warning(f"Node address for {node_id} not found in peer registry")
+                    continue
+
+                # Perform heartbeat check
+                old_timeout = socket.getdefaulttimeout()
                 try:
+                    socket.setdefaulttimeout(heartbeat_timeout)
                     proxy = ServerProxy(node_address)
                     response = proxy.heartbeat()
+                    self.node_health[node_id]['last_active'] = datetime.now(timezone.utc)
+                    logger.debug(f"Heartbeat response from {node_id}: {response}")
+
                 except Exception as e:
                     self.node_health[node_id]['consecutive_failures'] += 1
                     logger.warning(f"Heartbeat to {node_id} failed: {e}")
@@ -584,70 +629,137 @@ class XMLRPCServer:
                         # Mark node as failed
                         self.node_health[node_id]['status'] = 'failed'
                         await self.handle_node_failure(node_id)
+                finally:
+                    socket.setdefaulttimeout(old_timeout)
 
             await asyncio.sleep(heartbeat_interval)
 
     async def handle_node_failure(self, node_id: str):
+        """
+        Remove all members that were connected through a failed node.
+
+        Removes those that belong to node_id from every room administered,
+        broadcast member left for each removed member.
+        """
         # Log the node failure
         logger.error(f"Node {node_id} marked as failed; members cleaned up.")
 
         # Find all members associated with that node
-        for room in self.room_manager.list_rooms():
-            room_id = room['room_id']
-            members = room.get("members", {})
+        for room_metadata in self.room_manager.list_rooms():
+            room_id = room_metadata['room_id']
+            room = self.room_manager.get_room(room_id)
+
+            if not room:
+                continue
+
+            # Collect members to remove
             members_to_remove = [
-                user_id for user_id, member_info in members.items()
-                if member_info.get("node_id") == node_id
+                username
+                for username in room.members
+                if room.admin_node == node_id
             ]
 
-            # Remove all members from that node
-            for user_id in members_to_remove:
-                self.room_manager.remove_member(room_id, user_id)
-                logger.info(
-                    f"Removed user {user_id} from room '{room['room_name']}' "
-                    f"(ID: {room_id}) due to node failure"
-                )
+            # Remove members
+            for username in members_to_remove:
+                removed = self.room_manager.remove_member(room_id, username)
+                if not removed:
+                    continue
 
-                # Create member_left event data
+                # Broadcast member_left event
+                event_data = {
+                    "room_id": room_id,
+                    "username": username,
+                    "member_count": len(room.members),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "reason": "Node failure",
+                }
+
+                # Broadcast to local clients via callback
+                if self._broadcast_callback:
+                    broadcast_msg = {"type": "member_left", "data": event_data}
+                    self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+
+                # Broadcast to peer nodes via XML-RPC
+                if self._broadcast_callback:
+                    peers = self.peer_registry.list_peers()
+                    for peer_node_id, peer_addr in peers.items():
+                        try:
+                            proxy = ServerProxy(peer_addr, allow_none=True)
+                            proxy.receive_member_event_broadcast(
+                                room_id, "member_left", event_data
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to broadcast member_left to {peer_node_id}: {e}"
+                            )
+
+
+    async def cleanup_stale_members(self, room_id: str):
+        """
+        Periodically check for stale members in the given rooms and remove them.
+        """
+        while True:
+            await asyncio.sleep(60)
+            # room_id validation
+            room = self.room_manager.get_room(room_id)
+            if not room:
+                continue
+
+            # Administrator validation
+            if room.admin_node != self.room_manager.node_id:
+                continue
+
+            current_time = datetime.now(timezone.utc)
+            stale_threshold = timedelta(minutes=5)
+            stale_members = []
+
+            for user_id in room.members:
+                if user_id not in self.node_health:
+                    self.node_health[user_id] = {
+                        "status": "healthy",
+                        "consecutive_failures": 0,
+                        "last_active": current_time
+                    }
+
+                last_active = self.node_health[user_id]['last_active']
+
+                if current_time - last_active > stale_threshold:
+                    stale_members.append(user_id)
+
+            for user_id in stale_members:
+                removed = self.room_manager.remove_member(room_id, user_id)
+                if not removed:
+                    continue
+
                 event_data = {
                     "room_id": room_id,
                     "username": user_id,
-                    "member_count": len(room.get("members", {})),
+                    "member_count": len(room.members),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "reason": "Connection timeout",
                 }
 
-                # Broadcast "member left" for each removed member
-                broadcast_member_left()
+                # Broadcast locally
+                if self._broadcast_callback:
+                    try:
+                        self._broadcast_callback(
+                            room_id,
+                            {"type": "member_left", "data": event_data}
+                        )
+                    except Exception as e:
+                        logger.error("Broadcast failed in stale cleanup: {}".format(e))
 
-
-    async def cleanup_stale_members(self, room_ids: set[str], user_id: str):
-        while True:
-            await asyncio.sleep(60)
-            for room_id in room_ids:
-                room = self.room_manager.get_room(room_id)
-                if not room:
-                    continue
-
-                current_time = datetime.now(timezone.utc)
-                stale_threshold = timedelta(minutes=5)
-                members_to_remove = []
-
-                for user_id in room.members:
-                    last_active = self.node_health[user_id]['last_active']
-
-                    if current_time - last_active > stale_threshold:
-                        # For remote members, ensure node is unhealthy
-                        if member_info['node_id'] != local_node_id:
-                            if self.node_health.get(member_info['node_id'], {}).get('status') == 'failed':
-                                members_to_remove.append(user_id)
-                        else:  # Local member, check websocket
-                            if member_info['websocket'].closed:
-                                members_to_remove.append(user_id)
-
-                for user_id in members_to_remove:
-                    self.room_manager.remove_member(room_id, user_id)
-
-                    broadcast_member_left()
-
+                # Broadcast to peer nodes
+                if self.peer_registry:
+                    for peer_node_id, peer_addr in self.peer_registry.list_peers().items():
+                        try:
+                            proxy = ServerProxy(peer_addr, allow_none=True)
+                            proxy.receive_member_event_broadcast(
+                                room_id, "member_left", event_data
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to broadcast member_left to {peer_node_id}: {e}"
+                            )
 
 
