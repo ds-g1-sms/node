@@ -97,7 +97,7 @@ class TestDistributedMessageOrderingIntegration:
         msg = {
             "room_id": "room-123",
             "message_id": "shared-msg",
-            "sequence_number": 10,
+            "sequence_number": 1,
         }
 
         await client._handle_new_message(msg)
