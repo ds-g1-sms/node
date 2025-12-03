@@ -917,16 +917,22 @@ class ChatApp(App):
     def _on_room_deleted(self, data: Dict[str, Any]) -> None:
         """Callback when a room is deleted (for all members)."""
         room_name = data.get("room_name", self.current_room_name)
-        self.call_later(
-            lambda: self._handle_room_deleted_notification(room_name)
-        )
+        asyncio.create_task(self._handle_room_deleted_notification(room_name))
 
-    def _handle_room_deleted_notification(self, room_name: str) -> None:
+    async def _handle_room_deleted_notification(self, room_name: str) -> None:
         """Handle the room deleted notification in the UI."""
         # Cancel receive task
         if self._receive_task:
             self._receive_task.cancel()
+            try:
+                await self._receive_task
+            except asyncio.CancelledError:
+                pass
             self._receive_task = None
+
+        # Clear client message buffer (like in _handle_leave_room)
+        if self.client:
+            self.client.leave_current_room()
 
         # Clear room state
         self.current_room_id = None
@@ -935,8 +941,20 @@ class ChatApp(App):
         self.current_members = []
         self._deletion_in_progress = False
 
-        # Show room list and notify
+        # Clear messages from UI
+        try:
+            messages = self.query_one(
+                "#messages-container", ScrollableContainer
+            )
+            await messages.remove_children()
+        except NoMatches:
+            pass
+
+        # Show room list and refresh
         self._show_screen("room-list")
+        await self._refresh_rooms(global_discovery=True)
+
+        # Show notification
         try:
             status = self.query_one("#room-status", Static)
             status.update(f"[yellow]Room '{room_name}' has been deleted.[/]")
