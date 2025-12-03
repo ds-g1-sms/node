@@ -159,6 +159,36 @@ class CreateRoomDialog(Container):
         yield Static("", id="create-room-status", classes="status-message")
 
 
+class DeleteRoomDialog(Container):
+    """Confirmation dialog for deleting a room."""
+
+    def compose(self) -> ComposeResult:
+        """Compose the delete room dialog."""
+        yield Static(
+            "[bold red]Delete Room[/]",
+            classes="screen-title",
+        )
+        with Vertical(id="delete-room-form"):
+            yield Static(
+                "",
+                id="delete-room-message",
+                classes="dialog-message",
+            )
+            yield Static(
+                "[yellow]This action cannot be undone. "
+                "All members will be disconnected.[/]",
+                classes="warning-message",
+            )
+            with Horizontal(classes="button-row"):
+                yield Button(
+                    "Cancel", id="cancel-delete-btn", variant="default"
+                )
+                yield Button(
+                    "Delete Room", id="confirm-delete-btn", variant="error"
+                )
+        yield Static("", id="delete-room-status", classes="status-message")
+
+
 class ChatScreen(Container):
     """Screen for chatting in a room."""
 
@@ -179,6 +209,12 @@ class ChatScreen(Container):
                 yield ListView(id="member-list")
                 yield Button(
                     "Leave Room", id="leave-room-btn", variant="warning"
+                )
+                yield Button(
+                    "Delete Room",
+                    id="delete-room-btn",
+                    variant="error",
+                    classes="hidden",
                 )
 
 
@@ -342,6 +378,35 @@ class ChatApp(App):
         text-align: center;
         text-style: italic;
     }
+
+    .hidden {
+        display: none;
+    }
+
+    #delete-room-btn {
+        margin: 1 0 0 0;
+    }
+
+    DeleteRoomDialog {
+        align: center middle;
+        padding: 2;
+    }
+
+    #delete-room-form {
+        width: 50;
+        padding: 1;
+        border: solid red;
+    }
+
+    .dialog-message {
+        padding: 1 0;
+        text-align: center;
+    }
+
+    .warning-message {
+        padding: 1 0;
+        text-align: center;
+    }
     """
 
     BINDINGS = [
@@ -357,9 +422,12 @@ class ChatApp(App):
         self.username: Optional[str] = None
         self.current_room_id: Optional[str] = None
         self.current_room_name: Optional[str] = None
+        self.current_room_creator: Optional[str] = None
         self.current_members: List[str] = []
         self._current_screen = "connection"
         self._receive_task: Optional[asyncio.Task] = None
+        self._deletion_in_progress = False
+        self._rooms_cache: Dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
         """Compose the main application layout."""
@@ -367,6 +435,7 @@ class ChatApp(App):
         yield ConnectionScreen(id="connection-screen")
         yield RoomListScreen(id="room-list-screen")
         yield CreateRoomDialog(id="create-room-dialog")
+        yield DeleteRoomDialog(id="delete-room-dialog")
         yield ChatScreen(id="chat-screen")
         yield Footer()
 
@@ -380,6 +449,7 @@ class ChatApp(App):
             "connection": "connection-screen",
             "room-list": "room-list-screen",
             "create-room": "create-room-dialog",
+            "delete-room": "delete-room-dialog",
             "chat": "chat-screen",
         }
 
@@ -414,6 +484,12 @@ class ChatApp(App):
             await self._handle_send_message()
         elif button_id == "leave-room-btn":
             await self._handle_leave_room()
+        elif button_id == "delete-room-btn":
+            self._show_delete_confirmation()
+        elif button_id == "confirm-delete-btn":
+            await self._handle_delete_room()
+        elif button_id == "cancel-delete-btn":
+            self._show_screen("chat")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submit events (Enter key)."""
@@ -468,6 +544,11 @@ class ChatApp(App):
             self.client.set_on_member_joined(self._on_member_joined)
             self.client.set_on_member_left(self._on_member_left)
             self.client.set_on_ordering_gap_detected(self._on_ordering_gap)
+            # Set up deletion callbacks
+            self.client.set_on_delete_initiated(self._on_delete_initiated)
+            self.client.set_on_delete_success(self._on_delete_success)
+            self.client.set_on_delete_failed(self._on_delete_failed)
+            self.client.set_on_room_deleted(self._on_room_deleted)
 
             await self.client.connect()
             self.username = username
@@ -530,6 +611,9 @@ class ChatApp(App):
                     }
                     for r in response.rooms
                 ]
+
+            # Store rooms data for later reference (e.g., getting creator_id)
+            self._rooms_cache = {r["room_id"]: r for r in rooms_data}
 
             # Update table
             table.clear(columns=True)
@@ -635,6 +719,10 @@ class ChatApp(App):
             self.client.set_current_room(response.room_id)
             self.current_members = list(response.members)
 
+            # Get creator from cache (if available)
+            cached_room = self._rooms_cache.get(room_id, {})
+            self.current_room_creator = cached_room.get("creator_id")
+
             # Switch to chat screen
             self._show_screen("chat")
             self._update_chat_screen()
@@ -674,6 +762,7 @@ class ChatApp(App):
 
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_creator = None
         self.current_members = []
 
         # Clear messages
@@ -723,6 +812,14 @@ class ChatApp(App):
                 else:
                     display = member
                 member_list.append(ListItem(Label(display)))
+
+            # Show/hide delete button based on whether user is the creator
+            delete_btn = self.query_one("#delete-room-btn", Button)
+            is_creator = self.current_room_creator == self.username
+            if is_creator:
+                delete_btn.remove_class("hidden")
+            else:
+                delete_btn.add_class("hidden")
 
         except NoMatches:
             pass
@@ -792,6 +889,105 @@ class ChatApp(App):
             )
         )
 
+    def _on_delete_initiated(self, data: Dict[str, Any]) -> None:
+        """Callback when room deletion is initiated."""
+        initiator = data.get("initiator", "Unknown")
+        if initiator != self.username:
+            self.call_later(
+                lambda: self._add_system_message(
+                    f"🗑️ Room deletion initiated by {initiator}", "warning"
+                )
+            )
+
+    def _on_delete_success(self, data: Dict[str, Any]) -> None:
+        """Callback when room deletion succeeds (for initiator)."""
+        self._deletion_in_progress = False
+        # Will be handled by the async handler
+
+    def _on_delete_failed(self, data: Dict[str, Any]) -> None:
+        """Callback when room deletion fails."""
+        self._deletion_in_progress = False
+        reason = data.get("reason", "Unknown error")
+        self.call_later(
+            lambda r=reason: self._add_system_message(
+                f"❌ Room deletion failed: {r}", "error"
+            )
+        )
+
+    def _on_room_deleted(self, data: Dict[str, Any]) -> None:
+        """Callback when a room is deleted (for all members)."""
+        room_name = data.get("room_name", self.current_room_name)
+        self.call_later(
+            lambda: self._handle_room_deleted_notification(room_name)
+        )
+
+    def _handle_room_deleted_notification(self, room_name: str) -> None:
+        """Handle the room deleted notification in the UI."""
+        # Cancel receive task
+        if self._receive_task:
+            self._receive_task.cancel()
+            self._receive_task = None
+
+        # Clear room state
+        self.current_room_id = None
+        self.current_room_name = None
+        self.current_room_creator = None
+        self.current_members = []
+        self._deletion_in_progress = False
+
+        # Show room list and notify
+        self._show_screen("room-list")
+        try:
+            status = self.query_one("#room-status", Static)
+            status.update(f"[yellow]Room '{room_name}' has been deleted.[/]")
+        except NoMatches:
+            pass
+
+    def _show_delete_confirmation(self) -> None:
+        """Show the delete room confirmation dialog."""
+        try:
+            message = self.query_one("#delete-room-message", Static)
+            message.update(
+                f"Are you sure you want to delete "
+                f"[bold]'{self.current_room_name}'[/]?"
+            )
+            status = self.query_one("#delete-room-status", Static)
+            status.update("")
+            self._show_screen("delete-room")
+        except NoMatches:
+            pass
+
+    async def _handle_delete_room(self) -> None:
+        """Handle the room deletion request."""
+        if not self.client or not self.client.is_connected:
+            return
+
+        if self._deletion_in_progress:
+            return
+
+        if not self.current_room_id or not self.username:
+            return
+
+        try:
+            status = self.query_one("#delete-room-status", Static)
+            status.update("[yellow]Deleting room...[/]")
+            self._deletion_in_progress = True
+
+            # Send deletion request
+            await self.client.delete_room(self.current_room_id, self.username)
+
+            # Wait for response through the message loop
+            # The callbacks will handle the result
+
+        except Exception as e:
+            logger.error("Failed to initiate room deletion: %s", e)
+            self._deletion_in_progress = False
+            try:
+                status = self.query_one("#delete-room-status", Static)
+                status.update(f"[red]Error: {e}[/]")
+            except NoMatches:
+                pass
+
     def _add_chat_message(self, message: Dict[str, Any]) -> None:
         """Add a chat message to the display."""
         try:
@@ -835,6 +1031,8 @@ class ChatApp(App):
             asyncio.create_task(self._handle_leave_room())
         elif self._current_screen == "create-room":
             self._show_screen("room-list")
+        elif self._current_screen == "delete-room":
+            self._show_screen("chat")
         elif self._current_screen == "room-list":
             asyncio.create_task(self._handle_disconnect())
 

@@ -380,3 +380,36 @@ class ClientService:
             }
         )
         await self.websocket.send(request)
+
+    async def delete_room(self, room_id: str, username: str) -> None:
+        """
+        Delete a room using Two-Phase Commit.
+
+        This initiates a 2PC protocol to delete the room across all nodes.
+        The deletion progress and result will be received asynchronously
+        through the message receive loop.
+
+        Args:
+            room_id: ID of the room to delete
+            username: Username of the user requesting deletion
+                     (must be the room creator)
+
+        Raises:
+            ConnectionError: If not connected to a node server
+        """
+        if not self.is_connected:
+            raise ConnectionError("Not connected to a node server")
+
+        logger.info(f"Deleting room '{room_id}' by user '{username}'")
+
+        # Create and send request
+        request = json.dumps(
+            {
+                "type": "delete_room",
+                "data": {
+                    "room_id": room_id,
+                    "username": username,
+                },
+            }
+        )
+        await self.websocket.send(request)
