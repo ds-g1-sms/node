@@ -205,7 +205,9 @@ async def test_websocket_join_room_success():
     assert response["data"]["room_id"] == room.room_id
     assert response["data"]["room_name"] == "Test Room"
     assert "alice" in response["data"]["members"]
-    assert response["data"]["member_count"] == 1  # just alice (room starts empty)
+    assert (
+        response["data"]["member_count"] == 1
+    )  # just alice (room starts empty)
 
 
 @pytest.mark.asyncio
@@ -242,9 +244,7 @@ async def test_websocket_join_room_already_in_room():
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a room and add alice
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
 
     mock_ws = MockWebSocket()
@@ -304,9 +304,7 @@ async def test_websocket_join_room_broadcast_to_members():
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a room
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
 
     # Add an existing member with their websocket
     existing_ws = MockWebSocket()
@@ -396,9 +394,7 @@ def test_xmlrpc_join_room_already_in_room():
     )
 
     # Create a room and add alice
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
 
     result = server.join_room(room.room_id, "alice", "client_node")
@@ -641,9 +637,7 @@ def test_xmlrpc_leave_room_success():
     )
 
     # Create a room and add a member
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
 
     # Track broadcast calls
@@ -676,9 +670,7 @@ def test_xmlrpc_leave_room_not_in_room():
     )
 
     # Create a room without adding the user
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
 
     result = server.leave_room(room.room_id, "alice", "client_node")
 

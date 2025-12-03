@@ -87,9 +87,7 @@ class TestMessageBufferOrdering:
         buffer = MessageBuffer()
 
         for i in range(1, 5):
-            buffer.add_message(
-                {"message_id": f"msg-{i}", "sequence_number": i}
-            )
+            buffer.add_message({"message_id": f"msg-{i}", "sequence_number": i})
 
         displayable = buffer.get_new_messages()
         assert len(displayable) == 4
@@ -245,9 +243,7 @@ class TestMessageBufferLimit:
 
         # Add more messages than the limit
         for i in range(1, 16):
-            buffer.add_message(
-                {"message_id": f"msg-{i}", "sequence_number": i}
-            )
+            buffer.add_message({"message_id": f"msg-{i}", "sequence_number": i})
 
         assert buffer.get_buffered_count() == 10
         # Oldest should be removed
@@ -257,9 +253,7 @@ class TestMessageBufferLimit:
         """Test buffer clear functionality."""
         buffer = MessageBuffer()
         for i in range(1, 5):
-            buffer.add_message(
-                {"message_id": f"msg-{i}", "sequence_number": i}
-            )
+            buffer.add_message({"message_id": f"msg-{i}", "sequence_number": i})
         buffer.get_new_messages()
 
         buffer.clear()
@@ -287,9 +281,7 @@ class TestMessageBufferEdgeCases:
         buffer.get_new_messages()
 
         # Large gap
-        buffer.add_message(
-            {"message_id": "msg-100", "sequence_number": 100}
-        )
+        buffer.add_message({"message_id": "msg-100", "sequence_number": 100})
 
         assert buffer.has_gap() is True
         missing = buffer.get_missing_sequences()
@@ -304,9 +296,7 @@ class TestMessageBufferEdgeCases:
         assert buffer.last_displayed_seq == 10
 
         # Add message after the last displayed
-        buffer.add_message(
-            {"message_id": "msg-11", "sequence_number": 11}
-        )
+        buffer.add_message({"message_id": "msg-11", "sequence_number": 11})
         displayable = buffer.get_new_messages()
         assert len(displayable) == 1
 
@@ -405,20 +395,20 @@ class TestChatClientMessageHandling:
         client.set_current_room("room-123")
 
         received_messages = []
-        client.set_on_message_ready(
-            lambda msg: received_messages.append(msg)
-        )
+        client.set_on_message_ready(lambda msg: received_messages.append(msg))
 
         # Process messages
         for i in range(1, 4):
-            await client._handle_new_message({
-                "room_id": "room-123",
-                "message_id": f"msg-{i}",
-                "username": "alice",
-                "content": f"Message {i}",
-                "sequence_number": i,
-                "timestamp": "2025-11-23T10:00:00Z",
-            })
+            await client._handle_new_message(
+                {
+                    "room_id": "room-123",
+                    "message_id": f"msg-{i}",
+                    "username": "alice",
+                    "content": f"Message {i}",
+                    "sequence_number": i,
+                    "timestamp": "2025-11-23T10:00:00Z",
+                }
+            )
 
         assert len(received_messages) == 3
         assert [m["sequence_number"] for m in received_messages] == [1, 2, 3]
@@ -432,36 +422,40 @@ class TestChatClientMessageHandling:
         received_messages = []
         gap_detected = []
 
-        client.set_on_message_ready(
-            lambda msg: received_messages.append(msg)
-        )
+        client.set_on_message_ready(lambda msg: received_messages.append(msg))
         client.set_on_ordering_gap_detected(
             lambda room_id: gap_detected.append(room_id)
         )
 
         # Message 1
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-1",
-            "sequence_number": 1,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-1",
+                "sequence_number": 1,
+            }
+        )
         assert len(received_messages) == 1
 
         # Message 3 (skip 2)
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-3",
-            "sequence_number": 3,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-3",
+                "sequence_number": 3,
+            }
+        )
         assert len(received_messages) == 1  # Still 1
         assert len(gap_detected) == 1  # Gap detected
 
         # Message 2 arrives
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-2",
-            "sequence_number": 2,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-2",
+                "sequence_number": 2,
+            }
+        )
         assert len(received_messages) == 3  # Now 2 and 3 are displayed
 
     @pytest.mark.asyncio
@@ -471,16 +465,16 @@ class TestChatClientMessageHandling:
         client.set_current_room("room-123")
 
         received_messages = []
-        client.set_on_message_ready(
-            lambda msg: received_messages.append(msg)
-        )
+        client.set_on_message_ready(lambda msg: received_messages.append(msg))
 
         # Message for different room
-        await client._handle_new_message({
-            "room_id": "room-456",
-            "message_id": "msg-1",
-            "sequence_number": 1,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-456",
+                "message_id": "msg-1",
+                "sequence_number": 1,
+            }
+        )
 
         assert len(received_messages) == 0
 
@@ -518,12 +512,14 @@ class TestChatClientMessageHandling:
             lambda member: joined_members.append(member)
         )
 
-        await client._handle_member_joined({
-            "room_id": "room-123",
-            "username": "bob",
-            "member_count": 2,
-            "timestamp": "2025-11-23T10:00:00Z",
-        })
+        await client._handle_member_joined(
+            {
+                "room_id": "room-123",
+                "username": "bob",
+                "member_count": 2,
+                "timestamp": "2025-11-23T10:00:00Z",
+            }
+        )
 
         assert len(joined_members) == 1
         assert joined_members[0]["username"] == "bob"
@@ -539,10 +535,12 @@ class TestChatClientMessageHandling:
             lambda member: joined_members.append(member)
         )
 
-        await client._handle_member_joined({
-            "room_id": "room-456",
-            "username": "bob",
-        })
+        await client._handle_member_joined(
+            {
+                "room_id": "room-456",
+                "username": "bob",
+            }
+        )
 
         assert len(joined_members) == 0
 
@@ -559,16 +557,18 @@ class TestChatClientProcessMessage:
         received = []
         client.set_on_message_ready(lambda msg: received.append(msg))
 
-        message = json.dumps({
-            "type": "new_message",
-            "data": {
-                "room_id": "room-123",
-                "message_id": "msg-1",
-                "sequence_number": 1,
-                "username": "alice",
-                "content": "Hello!",
-            },
-        })
+        message = json.dumps(
+            {
+                "type": "new_message",
+                "data": {
+                    "room_id": "room-123",
+                    "message_id": "msg-1",
+                    "sequence_number": 1,
+                    "username": "alice",
+                    "content": "Hello!",
+                },
+            }
+        )
 
         await client._process_incoming_message(message)
 
@@ -584,14 +584,16 @@ class TestChatClientProcessMessage:
         joined = []
         client.set_on_member_joined(lambda m: joined.append(m))
 
-        message = json.dumps({
-            "type": "member_joined",
-            "data": {
-                "room_id": "room-123",
-                "username": "bob",
-                "member_count": 2,
-            },
-        })
+        message = json.dumps(
+            {
+                "type": "member_joined",
+                "data": {
+                    "room_id": "room-123",
+                    "username": "bob",
+                    "member_count": 2,
+                },
+            }
+        )
 
         await client._process_incoming_message(message)
 
@@ -615,10 +617,12 @@ class TestChatClientProcessMessage:
         received = []
         client.set_message_handler(lambda msg: received.append(msg))
 
-        message = json.dumps({
-            "type": "unknown_type",
-            "data": {},
-        })
+        message = json.dumps(
+            {
+                "type": "unknown_type",
+                "data": {},
+            }
+        )
 
         await client._process_incoming_message(message)
 
@@ -680,11 +684,13 @@ class TestAcceptanceScenarios:
         client.set_on_message_ready(lambda msg: received.append(msg))
 
         for seq in [1, 2, 3, 4]:
-            await client._handle_new_message({
-                "room_id": "room-123",
-                "message_id": f"msg-{seq}",
-                "sequence_number": seq,
-            })
+            await client._handle_new_message(
+                {
+                    "room_id": "room-123",
+                    "message_id": f"msg-{seq}",
+                    "sequence_number": seq,
+                }
+            )
 
         assert len(received) == 4
         assert [m["sequence_number"] for m in received] == [1, 2, 3, 4]
@@ -707,38 +713,46 @@ class TestAcceptanceScenarios:
         client.set_on_message_ready(lambda msg: received.append(msg))
 
         # Message 1
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-1",
-            "sequence_number": 1,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-1",
+                "sequence_number": 1,
+            }
+        )
         assert len(received) == 1
         assert received[-1]["sequence_number"] == 1
 
         # Message 3 (buffered)
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-3",
-            "sequence_number": 3,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-3",
+                "sequence_number": 3,
+            }
+        )
         assert len(received) == 1  # Still 1
 
         # Message 2 (triggers 2 and 3)
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-2",
-            "sequence_number": 2,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-2",
+                "sequence_number": 2,
+            }
+        )
         assert len(received) == 3
         assert received[-2]["sequence_number"] == 2
         assert received[-1]["sequence_number"] == 3
 
         # Message 4 (ready immediately)
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-4",
-            "sequence_number": 4,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-4",
+                "sequence_number": 4,
+            }
+        )
         assert len(received) == 4
         assert received[-1]["sequence_number"] == 4
 
@@ -764,35 +778,43 @@ class TestAcceptanceScenarios:
 
         # Messages 1-5
         for seq in range(1, 6):
-            await client._handle_new_message({
-                "room_id": "room-123",
-                "message_id": f"msg-{seq}",
-                "sequence_number": seq,
-            })
+            await client._handle_new_message(
+                {
+                    "room_id": "room-123",
+                    "message_id": f"msg-{seq}",
+                    "sequence_number": seq,
+                }
+            )
         assert len(received) == 5
 
         # Message 8 (gap - 6, 7 missing)
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-8",
-            "sequence_number": 8,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-8",
+                "sequence_number": 8,
+            }
+        )
         assert len(received) == 5  # Still 5
         assert len(gaps) == 1  # Gap detected
 
         # Message 6
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-6",
-            "sequence_number": 6,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-6",
+                "sequence_number": 6,
+            }
+        )
         assert len(received) == 6
 
         # Message 7 (triggers 7 and 8)
-        await client._handle_new_message({
-            "room_id": "room-123",
-            "message_id": "msg-7",
-            "sequence_number": 7,
-        })
+        await client._handle_new_message(
+            {
+                "room_id": "room-123",
+                "message_id": "msg-7",
+                "sequence_number": 7,
+            }
+        )
         assert len(received) == 8
         assert [m["sequence_number"] for m in received[-3:]] == [6, 7, 8]

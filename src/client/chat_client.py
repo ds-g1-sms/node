@@ -79,6 +79,17 @@ class ChatClient(ClientService):
             None
         )
         self._on_member_left: Optional[Callable[[Dict[str, Any]], None]] = None
+        # Room deletion callbacks
+        self._on_delete_initiated: Optional[
+            Callable[[Dict[str, Any]], None]
+        ] = None
+        self._on_delete_success: Optional[Callable[[Dict[str, Any]], None]] = (
+            None
+        )
+        self._on_delete_failed: Optional[Callable[[Dict[str, Any]], None]] = (
+            None
+        )
+        self._on_room_deleted: Optional[Callable[[Dict[str, Any]], None]] = None
 
         logger.info("ChatClient initialized for node: %s", node_url)
 
@@ -170,6 +181,50 @@ class ChatClient(ClientService):
         """
         self._on_member_left = callback
 
+    def set_on_delete_initiated(
+        self, callback: Callable[[Dict[str, Any]], None]
+    ) -> None:
+        """
+        Register callback for when room deletion is initiated.
+
+        Args:
+            callback: Function that receives deletion info dict
+        """
+        self._on_delete_initiated = callback
+
+    def set_on_delete_success(
+        self, callback: Callable[[Dict[str, Any]], None]
+    ) -> None:
+        """
+        Register callback for successful room deletion.
+
+        Args:
+            callback: Function that receives deletion result dict
+        """
+        self._on_delete_success = callback
+
+    def set_on_delete_failed(
+        self, callback: Callable[[Dict[str, Any]], None]
+    ) -> None:
+        """
+        Register callback for failed room deletion.
+
+        Args:
+            callback: Function that receives failure info dict
+        """
+        self._on_delete_failed = callback
+
+    def set_on_room_deleted(
+        self, callback: Callable[[Dict[str, Any]], None]
+    ) -> None:
+        """
+        Register callback for when a room is deleted (notification to members).
+
+        Args:
+            callback: Function that receives room deletion info dict
+        """
+        self._on_room_deleted = callback
+
     async def receive_messages(self) -> None:
         """
         Continuously receive and process messages from the server.
@@ -223,6 +278,14 @@ class ChatClient(ClientService):
             error_data = data.get("data", {})
             error_msg = error_data.get("error", "Unknown error")
             logger.error("Message send error: %s", error_msg)
+        elif message_type == "delete_room_initiated":
+            await self._handle_delete_initiated(data.get("data", {}))
+        elif message_type == "delete_room_success":
+            await self._handle_delete_success(data.get("data", {}))
+        elif message_type == "delete_room_failed":
+            await self._handle_delete_failed(data.get("data", {}))
+        elif message_type == "room_deleted":
+            await self._handle_room_deleted(data.get("data", {}))
         else:
             # Pass through to the original message handler if registered
             if self._message_handler:
@@ -341,6 +404,99 @@ class ChatClient(ClientService):
             member_data.get("username"),
             room_id,
         )
+
+    async def _handle_delete_initiated(
+        self, delete_data: Dict[str, Any]
+    ) -> None:
+        """
+        Handle delete_room_initiated notification.
+
+        Args:
+            delete_data: Deletion data dictionary containing:
+                - room_id
+                - initiator (optional)
+                - transaction_id
+                - status
+        """
+        room_id = delete_data.get("room_id")
+        logger.info(
+            "Room deletion initiated for room %s",
+            room_id,
+        )
+
+        if self._on_delete_initiated:
+            self._on_delete_initiated(delete_data)
+
+    async def _handle_delete_success(self, delete_data: Dict[str, Any]) -> None:
+        """
+        Handle delete_room_success notification.
+
+        Args:
+            delete_data: Deletion result dictionary containing:
+                - room_id
+                - transaction_id
+                - message
+        """
+        room_id = delete_data.get("room_id")
+        logger.info(
+            "Room deletion successful for room %s",
+            room_id,
+        )
+
+        if self._on_delete_success:
+            self._on_delete_success(delete_data)
+
+    async def _handle_delete_failed(self, delete_data: Dict[str, Any]) -> None:
+        """
+        Handle delete_room_failed notification.
+
+        Args:
+            delete_data: Failure info dictionary containing:
+                - room_id
+                - reason
+                - error_code
+                - transaction_id (optional)
+        """
+        room_id = delete_data.get("room_id")
+        reason = delete_data.get("reason", "Unknown reason")
+        logger.error(
+            "Room deletion failed for room %s: %s",
+            room_id,
+            reason,
+        )
+
+        if self._on_delete_failed:
+            self._on_delete_failed(delete_data)
+
+    async def _handle_room_deleted(self, delete_data: Dict[str, Any]) -> None:
+        """
+        Handle room_deleted notification (for members of a deleted room).
+
+        Args:
+            delete_data: Room deletion info dictionary containing:
+                - room_id
+                - room_name
+                - message
+        """
+        room_id = delete_data.get("room_id")
+        room_name = delete_data.get("room_name", "Unknown")
+        logger.info(
+            "Room '%s' (ID: %s) has been deleted",
+            room_name,
+            room_id,
+        )
+
+        # Clear message buffer for the deleted room
+        if room_id in self.message_buffers:
+            self.message_buffers[room_id].clear()
+            del self.message_buffers[room_id]
+
+        # If we were in this room, clear current room
+        if self.current_room == room_id:
+            self.current_room = None
+
+        if self._on_room_deleted:
+            self._on_room_deleted(delete_data)
 
     def get_buffer_for_room(self, room_id: str) -> Optional[MessageBuffer]:
         """

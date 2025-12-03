@@ -163,9 +163,7 @@ def test_peer_registry_query_peer_rooms_failure(mock_server_proxy):
 
 @patch("src.node.peer_registry.ThreadPoolExecutor")
 @patch("src.node.peer_registry.ServerProxy")
-def test_peer_registry_discover_global_rooms(
-    mock_server_proxy, mock_executor
-):
+def test_peer_registry_discover_global_rooms(mock_server_proxy, mock_executor):
     """Test global room discovery."""
     registry = PeerRegistry(node_id="node1")
     registry.register_peer("node2", "http://node2:9090")

@@ -80,6 +80,16 @@ class XMLRPCServer:
             self.receive_member_event_broadcast,
             "receive_member_event_broadcast",
         )
+        # 2PC room deletion methods
+        self.server.register_function(
+            self.prepare_delete_room, "prepare_delete_room"
+        )
+        self.server.register_function(
+            self.commit_delete_room, "commit_delete_room"
+        )
+        self.server.register_function(
+            self.rollback_delete_room, "rollback_delete_room"
+        )
 
         logger.info(f"XML-RPC server starting on {self.host}:{self.port}")
 
@@ -501,3 +511,127 @@ class XMLRPCServer:
             "success": True,
             "message": "Successfully left room",
         }
+
+    # ===== Two-Phase Commit (2PC) Methods for Room Deletion =====
+
+    def prepare_delete_room(
+        self, room_id: str, transaction_id: str, coordinator_node: str
+    ) -> Dict:
+        """
+        Phase 1 (PREPARE): Ask participant if ready to delete room.
+
+        This method is exposed via XML-RPC and is called by the coordinator
+        node during the PREPARE phase of 2PC.
+
+        Args:
+            room_id: ID of room to delete
+            transaction_id: Unique transaction identifier
+            coordinator_node: Node coordinating the deletion
+
+        Returns:
+            dict: Response with structure:
+            {
+                'vote': 'READY' or 'ABORT',
+                'reason': str (if ABORT),
+                'node_id': str,
+                'transaction_id': str
+            }
+        """
+        logger.info(
+            f"XML-RPC: prepare_delete_room called for room {room_id}, "
+            f"transaction {transaction_id} from {coordinator_node}"
+        )
+
+        result = self.room_manager.prepare_for_deletion(
+            room_id, transaction_id, coordinator_node
+        )
+
+        return result
+
+    def commit_delete_room(
+        self, room_id: str, transaction_id: str, room_name: str = None
+    ) -> Dict:
+        """
+        Phase 2 (COMMIT): Instruct participant to delete the room.
+
+        This method is exposed via XML-RPC and is called by the coordinator
+        node during the COMMIT phase of 2PC.
+
+        Args:
+            room_id: ID of room to delete
+            transaction_id: Transaction identifier from PREPARE
+            room_name: Name of the room (passed from coordinator)
+
+        Returns:
+            dict: Confirmation with structure:
+            {
+                'success': bool,
+                'node_id': str,
+                'error': str or None
+            }
+        """
+        logger.info(
+            f"XML-RPC: commit_delete_room called for room {room_id}, "
+            f"transaction {transaction_id}"
+        )
+
+        # Use provided room_name or try to get it from local room data
+        if room_name is None:
+            room = self.room_manager.get_room(room_id)
+            room_name = room.room_name if room else "Unknown"
+
+        result = self.room_manager.commit_deletion(room_id, transaction_id)
+
+        # Notify local clients that room was deleted
+        if result.get("success") and self._broadcast_callback:
+            notification = {
+                "type": "room_deleted",
+                "data": {
+                    "room_id": room_id,
+                    "room_name": room_name,
+                    "transaction_id": transaction_id,
+                },
+            }
+            self._broadcast_callback(room_id, notification, exclude_user=None)
+
+        return result
+
+    def rollback_delete_room(self, room_id: str, transaction_id: str) -> Dict:
+        """
+        Phase 2 (ROLLBACK): Instruct participant to abort deletion.
+
+        This method is exposed via XML-RPC and is called by the coordinator
+        node during the ROLLBACK phase of 2PC.
+
+        Args:
+            room_id: ID of room
+            transaction_id: Transaction identifier from PREPARE
+
+        Returns:
+            dict: Confirmation with structure:
+            {
+                'success': bool,
+                'node_id': str
+            }
+        """
+        logger.info(
+            f"XML-RPC: rollback_delete_room called for room {room_id}, "
+            f"transaction {transaction_id}"
+        )
+
+        result = self.room_manager.rollback_deletion_participant(
+            room_id, transaction_id
+        )
+
+        # Notify local clients that deletion was cancelled
+        if result.get("success") and self._broadcast_callback:
+            notification = {
+                "type": "delete_room_cancelled",
+                "data": {
+                    "room_id": room_id,
+                    "transaction_id": transaction_id,
+                },
+            }
+            self._broadcast_callback(room_id, notification, exclude_user=None)
+
+        return result

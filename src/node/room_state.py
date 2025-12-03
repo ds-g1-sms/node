@@ -6,12 +6,90 @@ Each node maintains its own list of rooms that it administers.
 """
 
 import logging
+from enum import Enum
 from typing import Dict, List, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import uuid
 
 logger = logging.getLogger(__name__)
+
+
+class RoomState(Enum):
+    """Room lifecycle states for 2PC deletion protocol."""
+
+    ACTIVE = "ACTIVE"
+    DELETION_PENDING = "DELETION_PENDING"
+    COMMITTING = "COMMITTING"
+    ROLLING_BACK = "ROLLING_BACK"
+
+
+class TransactionState(Enum):
+    """2PC transaction states for the coordinator."""
+
+    PREPARE = "PREPARE"
+    COMMIT = "COMMIT"
+    ROLLBACK = "ROLLBACK"
+    COMPLETED = "COMPLETED"
+
+
+@dataclass
+class DeletionTransaction:
+    """
+    Represents a 2PC deletion transaction.
+
+    Used by the coordinator (admin node) to track the state of a
+    distributed room deletion operation.
+
+    Attributes:
+        transaction_id: Unique identifier for this transaction
+        room_id: ID of the room being deleted
+        state: Current state of the transaction
+        participants: List of participant node IDs
+        votes: Dict mapping node_id to vote ('READY' or 'ABORT')
+        start_time: ISO 8601 timestamp when transaction started
+        timeout: Timeout in seconds for each phase
+    """
+
+    transaction_id: str
+    room_id: str
+    state: TransactionState
+    participants: List[str]
+    votes: Dict[str, Optional[str]] = field(default_factory=dict)
+    start_time: str = ""
+    timeout: int = 5
+
+    def __post_init__(self):
+        """Initialize start time if not set."""
+        if not self.start_time:
+            self.start_time = datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
+class PreparedTransaction:
+    """
+    Represents a prepared transaction on a participant node.
+
+    Used by participants to track transactions they have voted on.
+
+    Attributes:
+        transaction_id: Unique identifier for this transaction
+        room_id: ID of the room being deleted
+        coordinator: Node ID of the coordinator
+        vote: Vote cast ('READY' or 'ABORT')
+        prepared_at: ISO 8601 timestamp when vote was cast
+    """
+
+    transaction_id: str
+    room_id: str
+    coordinator: str
+    vote: str
+    prepared_at: str = ""
+
+    def __post_init__(self):
+        """Initialize prepared_at if not set."""
+        if not self.prepared_at:
+            self.prepared_at = datetime.now(timezone.utc).isoformat()
 
 
 @dataclass
@@ -29,6 +107,7 @@ class Room:
         created_at: ISO 8601 timestamp when the room was created
         message_counter: Counter for assigning sequence numbers to messages
         messages: List of messages in the room (in-memory buffer)
+        state: Current room state for 2PC protocol
     """
 
     room_id: str
@@ -40,6 +119,7 @@ class Room:
     created_at: str
     message_counter: int = 0
     messages: list = None
+    state: RoomState = RoomState.ACTIVE
 
     def __post_init__(self):
         """Initialize the messages list if not set."""
@@ -54,6 +134,7 @@ class Room:
             "description": self.description,
             "member_count": len(self.members),
             "admin_node": self.admin_node,
+            "creator_id": self.creator_id,
         }
 
 
@@ -62,7 +143,8 @@ class RoomStateManager:
     Manages the state of all rooms hosted on this node.
 
     This class provides thread-safe operations for creating, listing,
-    and managing rooms on the node.
+    and managing rooms on the node. Also supports Two-Phase Commit (2PC)
+    for coordinated room deletion across distributed nodes.
     """
 
     def __init__(self, node_id: str):
@@ -74,6 +156,9 @@ class RoomStateManager:
         """
         self.node_id = node_id
         self._rooms: Dict[str, Room] = {}
+        # 2PC transaction tracking
+        self._deletion_transactions: Dict[str, DeletionTransaction] = {}
+        self._prepared_transactions: Dict[str, PreparedTransaction] = {}
         logger.info(f"RoomStateManager initialized for node: {node_id}")
 
     def create_room(
@@ -266,3 +351,349 @@ class RoomStateManager:
         )
 
         return message
+
+    # ===== Two-Phase Commit (2PC) Methods for Room Deletion =====
+
+    def start_deletion_transaction(
+        self, room_id: str, participants: List[str]
+    ) -> Optional[DeletionTransaction]:
+        """
+        Start a new 2PC deletion transaction as the coordinator.
+
+        Args:
+            room_id: ID of the room to delete
+            participants: List of participant node IDs
+
+        Returns:
+            DeletionTransaction if started successfully, None otherwise
+        """
+        room = self._rooms.get(room_id)
+        if not room:
+            logger.warning(f"Cannot start deletion: Room {room_id} not found")
+            return None
+
+        if room.state != RoomState.ACTIVE:
+            logger.warning(
+                f"Cannot start deletion: Room {room_id} is in state "
+                f"{room.state.value}"
+            )
+            return None
+
+        transaction_id = str(uuid.uuid4())
+        transaction = DeletionTransaction(
+            transaction_id=transaction_id,
+            room_id=room_id,
+            state=TransactionState.PREPARE,
+            participants=participants,
+            votes={node_id: None for node_id in participants},
+        )
+
+        self._deletion_transactions[transaction_id] = transaction
+        room.state = RoomState.DELETION_PENDING
+
+        logger.info(
+            f"Started deletion transaction {transaction_id} for room "
+            f"{room_id} with {len(participants)} participants"
+        )
+
+        return transaction
+
+    def get_deletion_transaction(
+        self, transaction_id: str
+    ) -> Optional[DeletionTransaction]:
+        """Get a deletion transaction by ID."""
+        return self._deletion_transactions.get(transaction_id)
+
+    def record_vote(self, transaction_id: str, node_id: str, vote: str) -> bool:
+        """
+        Record a vote from a participant node.
+
+        Args:
+            transaction_id: The transaction ID
+            node_id: The voting node's ID
+            vote: The vote ('READY' or 'ABORT')
+
+        Returns:
+            True if vote was recorded, False otherwise
+        """
+        transaction = self._deletion_transactions.get(transaction_id)
+        if not transaction:
+            logger.warning(
+                f"Cannot record vote: Transaction {transaction_id} not found"
+            )
+            return False
+
+        if node_id not in transaction.votes:
+            logger.warning(
+                f"Cannot record vote: Node {node_id} not a participant"
+            )
+            return False
+
+        transaction.votes[node_id] = vote
+        logger.info(
+            f"Recorded vote {vote} from {node_id} for transaction "
+            f"{transaction_id}"
+        )
+        return True
+
+    def all_votes_ready(self, transaction_id: str) -> bool:
+        """Check if all participants voted READY."""
+        transaction = self._deletion_transactions.get(transaction_id)
+        if not transaction:
+            return False
+
+        return all(vote == "READY" for vote in transaction.votes.values())
+
+    def all_votes_received(self, transaction_id: str) -> bool:
+        """Check if all votes have been received."""
+        transaction = self._deletion_transactions.get(transaction_id)
+        if not transaction:
+            return False
+
+        return all(vote is not None for vote in transaction.votes.values())
+
+    def transition_to_commit(self, transaction_id: str) -> bool:
+        """Transition a transaction to COMMIT state."""
+        transaction = self._deletion_transactions.get(transaction_id)
+        if not transaction:
+            return False
+
+        transaction.state = TransactionState.COMMIT
+        room = self._rooms.get(transaction.room_id)
+        if room:
+            room.state = RoomState.COMMITTING
+
+        logger.info(f"Transaction {transaction_id} transitioned to COMMIT")
+        return True
+
+    def transition_to_rollback(self, transaction_id: str) -> bool:
+        """Transition a transaction to ROLLBACK state."""
+        transaction = self._deletion_transactions.get(transaction_id)
+        if not transaction:
+            return False
+
+        transaction.state = TransactionState.ROLLBACK
+        room = self._rooms.get(transaction.room_id)
+        if room:
+            room.state = RoomState.ROLLING_BACK
+
+        logger.info(f"Transaction {transaction_id} transitioned to ROLLBACK")
+        return True
+
+    def complete_deletion(self, transaction_id: str) -> bool:
+        """
+        Complete a deletion transaction by removing the room.
+
+        Args:
+            transaction_id: The transaction ID
+
+        Returns:
+            True if room was deleted, False otherwise
+        """
+        transaction = self._deletion_transactions.get(transaction_id)
+        if not transaction:
+            return False
+
+        room_id = transaction.room_id
+        success = self.delete_room(room_id)
+
+        transaction.state = TransactionState.COMPLETED
+        del self._deletion_transactions[transaction_id]
+
+        logger.info(
+            f"Completed deletion transaction {transaction_id}, "
+            f"room deleted: {success}"
+        )
+        return success
+
+    def rollback_deletion(self, transaction_id: str) -> bool:
+        """
+        Rollback a deletion transaction, restoring room to ACTIVE state.
+
+        Args:
+            transaction_id: The transaction ID
+
+        Returns:
+            True if rollback succeeded, False otherwise
+        """
+        transaction = self._deletion_transactions.get(transaction_id)
+        if not transaction:
+            return False
+
+        room = self._rooms.get(transaction.room_id)
+        if room:
+            room.state = RoomState.ACTIVE
+
+        transaction.state = TransactionState.COMPLETED
+        del self._deletion_transactions[transaction_id]
+
+        logger.info(f"Rolled back deletion transaction {transaction_id}")
+        return True
+
+    # ===== Participant-side 2PC Methods =====
+
+    def prepare_for_deletion(
+        self, room_id: str, transaction_id: str, coordinator: str
+    ) -> Dict:
+        """
+        Prepare to delete a room (participant's PREPARE phase).
+
+        This is called on participant nodes when the coordinator
+        sends a PREPARE message.
+
+        Args:
+            room_id: ID of the room to delete
+            transaction_id: The transaction ID
+            coordinator: Node ID of the coordinator
+
+        Returns:
+            dict: Vote result with 'vote' and optionally 'reason'
+        """
+        room = self._rooms.get(room_id)
+
+        # 2PC Protocol Note: If room doesn't exist on this participant node,
+        # we vote READY because there's nothing to clean up locally. This is
+        # safe in 2PC - the coordinator only needs all participants to agree
+        # they CAN delete; if there's nothing to delete, that's a valid READY.
+        if not room:
+            logger.info(
+                f"Room {room_id} not on this node, voting READY for "
+                f"transaction {transaction_id}"
+            )
+            return {
+                "vote": "READY",
+                "node_id": self.node_id,
+                "transaction_id": transaction_id,
+            }
+
+        # Check if room is in a state that allows deletion
+        if room.state != RoomState.ACTIVE:
+            logger.warning(
+                f"Cannot prepare deletion: Room {room_id} is in state "
+                f"{room.state.value}"
+            )
+            return {
+                "vote": "ABORT",
+                "node_id": self.node_id,
+                "transaction_id": transaction_id,
+                "reason": f"Room in {room.state.value} state",
+            }
+
+        # Mark room as deletion pending
+        room.state = RoomState.DELETION_PENDING
+
+        # Track the prepared transaction
+        prepared = PreparedTransaction(
+            transaction_id=transaction_id,
+            room_id=room_id,
+            coordinator=coordinator,
+            vote="READY",
+        )
+        self._prepared_transactions[transaction_id] = prepared
+
+        logger.info(
+            f"Prepared for deletion of room {room_id}, voting READY for "
+            f"transaction {transaction_id}"
+        )
+
+        return {
+            "vote": "READY",
+            "node_id": self.node_id,
+            "transaction_id": transaction_id,
+        }
+
+    def commit_deletion(self, room_id: str, transaction_id: str) -> Dict:
+        """
+        Commit the deletion of a room (participant's COMMIT phase).
+
+        Args:
+            room_id: ID of the room to delete
+            transaction_id: The transaction ID
+
+        Returns:
+            dict: Confirmation with 'success' flag
+        """
+        room = self._rooms.get(room_id)
+
+        # Clean up prepared transaction tracking
+        if transaction_id in self._prepared_transactions:
+            del self._prepared_transactions[transaction_id]
+
+        # If room doesn't exist, treat as success
+        if not room:
+            logger.info(
+                f"Room {room_id} not on this node, commit successful for "
+                f"transaction {transaction_id}"
+            )
+            return {
+                "success": True,
+                "node_id": self.node_id,
+            }
+
+        # Delete the room
+        success = self.delete_room(room_id)
+
+        logger.info(
+            f"Committed deletion of room {room_id} for transaction "
+            f"{transaction_id}, success: {success}"
+        )
+
+        return {
+            "success": success,
+            "node_id": self.node_id,
+        }
+
+    def rollback_deletion_participant(
+        self, room_id: str, transaction_id: str
+    ) -> Dict:
+        """
+        Rollback a pending deletion (participant's ROLLBACK phase).
+
+        Args:
+            room_id: ID of the room
+            transaction_id: The transaction ID
+
+        Returns:
+            dict: Confirmation with 'success' flag
+        """
+        room = self._rooms.get(room_id)
+
+        # Clean up prepared transaction tracking
+        if transaction_id in self._prepared_transactions:
+            del self._prepared_transactions[transaction_id]
+
+        # If room exists, restore to ACTIVE state
+        if room:
+            room.state = RoomState.ACTIVE
+            logger.info(
+                f"Rolled back deletion of room {room_id} for transaction "
+                f"{transaction_id}"
+            )
+        else:
+            logger.info(
+                f"Room {room_id} not on this node, rollback successful for "
+                f"transaction {transaction_id}"
+            )
+
+        return {
+            "success": True,
+            "node_id": self.node_id,
+        }
+
+    def can_operate_on_room(self, room_id: str) -> bool:
+        """
+        Check if normal operations (join, message) can be performed on a room.
+
+        Returns False if room is in a 2PC deletion state.
+
+        Args:
+            room_id: The room ID
+
+        Returns:
+            bool: True if operations are allowed, False otherwise
+        """
+        room = self._rooms.get(room_id)
+        if not room:
+            return False
+
+        return room.state == RoomState.ACTIVE

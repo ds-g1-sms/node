@@ -7,16 +7,21 @@ Handles WebSocket connections from clients and processes their requests.
 import asyncio
 import logging
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from typing import Set, Dict, Optional
+from typing import Set, Dict, Optional, List
 from xmlrpc.client import ServerProxy
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from .room_state import RoomStateManager
+from .room_state import RoomStateManager, RoomState
 from .peer_registry import PeerRegistry
 
 logger = logging.getLogger(__name__)
+
+# 2PC timeout constants
+PREPARE_TIMEOUT = 5  # seconds
+COMMIT_TIMEOUT = 5  # seconds
 
 
 class WebSocketServer:
@@ -233,6 +238,8 @@ class WebSocketServer:
                 await self.handle_leave_room(websocket, data)
             elif message_type == "send_message":
                 await self.handle_send_message(websocket, data)
+            elif message_type == "delete_room":
+                await self.handle_delete_room(websocket, data)
             else:
                 logger.warning(f"Unknown message type: {message_type}")
                 await self.send_error(
@@ -1114,4 +1121,429 @@ class WebSocketServer:
                 "error_code": error_code,
             },
         }
+        await websocket.send(json.dumps(response))
+
+    # ===== Room Deletion with Two-Phase Commit (2PC) =====
+
+    async def handle_delete_room(
+        self, websocket: WebSocketServerProtocol, data: dict
+    ):
+        """
+        Handle a delete_room request from a client.
+
+        This initiates a Two-Phase Commit protocol to delete the room
+        across all nodes that have members in the room.
+
+        Args:
+            websocket: The WebSocket connection
+            data: The request data containing room_id and username
+        """
+        try:
+            # Extract parameters
+            request_data = data.get("data", {})
+            room_id = request_data.get("room_id")
+            username = request_data.get("username")
+
+            if not room_id or not username:
+                await self._send_delete_room_error(
+                    websocket,
+                    room_id or "",
+                    "Missing room_id or username",
+                    "INVALID_REQUEST",
+                )
+                return
+
+            logger.info(
+                f"Processing delete_room request: room {room_id} by {username}"
+            )
+
+            # Check if this node administers the room
+            room = self.room_manager.get_room(room_id)
+
+            if not room:
+                await self._send_delete_room_error(
+                    websocket,
+                    room_id,
+                    "Room not found",
+                    "ROOM_NOT_FOUND",
+                )
+                return
+
+            # Verify that the requester is the room creator
+            if room.creator_id != username:
+                await self._send_delete_room_error(
+                    websocket,
+                    room_id,
+                    "Only the room creator can delete the room",
+                    "UNAUTHORIZED",
+                )
+                return
+
+            # Check room state
+            if room.state != RoomState.ACTIVE:
+                await self._send_delete_room_error(
+                    websocket,
+                    room_id,
+                    f"Room is in {room.state.value} state, cannot delete",
+                    "INVALID_STATE",
+                )
+                return
+
+            # Get list of participant nodes (all peer nodes)
+            participants = []
+            if self.peer_registry:
+                participants = list(self.peer_registry.list_peers().keys())
+
+            # Start 2PC transaction
+            transaction = self.room_manager.start_deletion_transaction(
+                room_id, participants
+            )
+
+            if not transaction:
+                await self._send_delete_room_error(
+                    websocket,
+                    room_id,
+                    "Failed to start deletion transaction",
+                    "INTERNAL_ERROR",
+                )
+                return
+
+            # Send initiated response
+            initiated_response = {
+                "type": "delete_room_initiated",
+                "data": {
+                    "room_id": room_id,
+                    "transaction_id": transaction.transaction_id,
+                    "status": "in_progress",
+                },
+            }
+            await websocket.send(json.dumps(initiated_response))
+
+            # Notify room members that deletion is starting
+            await self._notify_deletion_initiated(room_id, username)
+
+            # Execute 2PC (pass room_name for participant notifications)
+            success, error_reason = await self._execute_2pc_deletion(
+                transaction, room_id, room.room_name
+            )
+
+            if success:
+                # Send success response
+                success_response = {
+                    "type": "delete_room_success",
+                    "data": {
+                        "room_id": room_id,
+                        "transaction_id": transaction.transaction_id,
+                        "message": "Room deleted successfully",
+                    },
+                }
+                await websocket.send(json.dumps(success_response))
+
+                # Notify all local clients that room was deleted
+                await self._notify_room_deleted(room_id, room.room_name)
+            else:
+                # Send failure response
+                await self._send_delete_room_error(
+                    websocket,
+                    room_id,
+                    error_reason or "Deletion failed",
+                    "DELETION_FAILED",
+                    transaction.transaction_id,
+                )
+
+        except Exception as e:
+            logger.error(f"Error processing delete_room: {e}")
+            room_id = data.get("data", {}).get("room_id", "")
+            await self._send_delete_room_error(
+                websocket, room_id, str(e), "INTERNAL_ERROR"
+            )
+
+    async def _execute_2pc_deletion(
+        self, transaction, room_id: str, room_name: str
+    ) -> tuple:
+        """
+        Execute the Two-Phase Commit protocol for room deletion.
+
+        Args:
+            transaction: The DeletionTransaction object
+            room_id: The room ID being deleted
+            room_name: The room name for participant notifications
+
+        Returns:
+            tuple: (success: bool, error_reason: Optional[str])
+        """
+        transaction_id = transaction.transaction_id
+        participants = transaction.participants
+
+        # Phase 1: PREPARE - collect votes from all participants
+        logger.info(
+            f"2PC PREPARE phase for transaction {transaction_id} "
+            f"with {len(participants)} participants"
+        )
+
+        all_ready = True
+        abort_reason = None
+
+        if participants:
+            votes = await self._collect_prepare_votes(
+                room_id, transaction_id, participants
+            )
+
+            for node_id, vote_result in votes.items():
+                if vote_result is None:
+                    # Timeout
+                    all_ready = False
+                    abort_reason = f"Node {node_id} timed out"
+                    self.room_manager.record_vote(
+                        transaction_id, node_id, "ABORT"
+                    )
+                elif vote_result.get("vote") == "ABORT":
+                    all_ready = False
+                    abort_reason = vote_result.get(
+                        "reason", f"Node {node_id} voted ABORT"
+                    )
+                    self.room_manager.record_vote(
+                        transaction_id, node_id, "ABORT"
+                    )
+                else:
+                    self.room_manager.record_vote(
+                        transaction_id, node_id, "READY"
+                    )
+
+        # Phase 2: COMMIT or ROLLBACK
+        if all_ready:
+            logger.info(f"2PC COMMIT phase for transaction {transaction_id}")
+            self.room_manager.transition_to_commit(transaction_id)
+
+            # Send COMMIT to all participants (include room_name for notifications)
+            if participants:
+                await self._send_commit_to_participants(
+                    room_id, transaction_id, participants, room_name
+                )
+
+            # Complete deletion on coordinator (this node)
+            self.room_manager.complete_deletion(transaction_id)
+
+            return True, None
+        else:
+            logger.info(
+                f"2PC ROLLBACK phase for transaction {transaction_id}: "
+                f"{abort_reason}"
+            )
+            self.room_manager.transition_to_rollback(transaction_id)
+
+            # Send ROLLBACK to all participants
+            if participants:
+                await self._send_rollback_to_participants(
+                    room_id, transaction_id, participants
+                )
+
+            # Rollback on coordinator
+            self.room_manager.rollback_deletion(transaction_id)
+
+            return False, abort_reason
+
+    async def _collect_prepare_votes(
+        self,
+        room_id: str,
+        transaction_id: str,
+        participants: List[str],
+    ) -> Dict[str, Optional[dict]]:
+        """
+        Collect PREPARE votes from all participant nodes.
+
+        Args:
+            room_id: The room ID
+            transaction_id: The transaction ID
+            participants: List of participant node IDs
+
+        Returns:
+            Dict mapping node_id to vote result (or None for timeout)
+        """
+        votes = {}
+
+        def call_prepare(node_id: str, node_addr: str) -> tuple:
+            """Call prepare_delete_room on a participant node."""
+            try:
+                proxy = ServerProxy(node_addr, allow_none=True)
+                result = proxy.prepare_delete_room(
+                    room_id,
+                    transaction_id,
+                    self.room_manager.node_id,
+                )
+                return node_id, result
+            except Exception as e:
+                logger.error(f"Failed to send PREPARE to {node_id}: {e}")
+                return node_id, None
+
+        # Use ThreadPoolExecutor for parallel XML-RPC calls
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=len(participants)) as executor:
+            futures = []
+            for node_id in participants:
+                node_addr = self.peer_registry.get_peer_address(node_id)
+                if node_addr:
+                    future = loop.run_in_executor(
+                        executor, call_prepare, node_id, node_addr
+                    )
+                    futures.append(future)
+                else:
+                    votes[node_id] = None
+
+            # Wait for all with timeout
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*futures, return_exceptions=True),
+                    timeout=PREPARE_TIMEOUT,
+                )
+                for result in results:
+                    if isinstance(result, tuple):
+                        node_id, vote = result
+                        votes[node_id] = vote
+                    elif isinstance(result, Exception):
+                        logger.error(f"PREPARE error: {result}")
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"PREPARE phase timeout for transaction {transaction_id}"
+                )
+                # Mark remaining as None (timeout)
+                for node_id in participants:
+                    if node_id not in votes:
+                        votes[node_id] = None
+
+        return votes
+
+    async def _send_commit_to_participants(
+        self,
+        room_id: str,
+        transaction_id: str,
+        participants: List[str],
+        room_name: str,
+    ):
+        """Send COMMIT to all participant nodes."""
+
+        def call_commit(node_id: str, node_addr: str) -> tuple:
+            """Call commit_delete_room on a participant node."""
+            try:
+                proxy = ServerProxy(node_addr, allow_none=True)
+                result = proxy.commit_delete_room(
+                    room_id, transaction_id, room_name
+                )
+                return node_id, result
+            except Exception as e:
+                logger.error(f"Failed to send COMMIT to {node_id}: {e}")
+                return node_id, {"success": False, "error": str(e)}
+
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=len(participants)) as executor:
+            futures = []
+            for node_id in participants:
+                node_addr = self.peer_registry.get_peer_address(node_id)
+                if node_addr:
+                    future = loop.run_in_executor(
+                        executor, call_commit, node_id, node_addr
+                    )
+                    futures.append(future)
+
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*futures, return_exceptions=True),
+                    timeout=COMMIT_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"COMMIT phase timeout for transaction {transaction_id}"
+                )
+
+    async def _send_rollback_to_participants(
+        self,
+        room_id: str,
+        transaction_id: str,
+        participants: List[str],
+    ):
+        """Send ROLLBACK to all participant nodes."""
+
+        def call_rollback(node_id: str, node_addr: str) -> tuple:
+            """Call rollback_delete_room on a participant node."""
+            try:
+                proxy = ServerProxy(node_addr, allow_none=True)
+                result = proxy.rollback_delete_room(room_id, transaction_id)
+                return node_id, result
+            except Exception as e:
+                logger.error(f"Failed to send ROLLBACK to {node_id}: {e}")
+                return node_id, {"success": False, "error": str(e)}
+
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=len(participants)) as executor:
+            futures = []
+            for node_id in participants:
+                node_addr = self.peer_registry.get_peer_address(node_id)
+                if node_addr:
+                    future = loop.run_in_executor(
+                        executor, call_rollback, node_id, node_addr
+                    )
+                    futures.append(future)
+
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*futures, return_exceptions=True),
+                    timeout=COMMIT_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"ROLLBACK phase timeout for transaction {transaction_id}"
+                )
+
+    async def _notify_deletion_initiated(self, room_id: str, initiator: str):
+        """Notify room members that deletion has been initiated."""
+        notification = {
+            "type": "delete_room_initiated",
+            "data": {
+                "room_id": room_id,
+                "initiator": initiator,
+                "status": "in_progress",
+            },
+        }
+        await self.broadcast_to_room(room_id, notification)
+
+    async def _notify_room_deleted(self, room_id: str, room_name: str):
+        """Notify all local clients that a room was deleted."""
+        notification = {
+            "type": "room_deleted",
+            "data": {
+                "room_id": room_id,
+                "room_name": room_name,
+                "message": f"Room '{room_name}' has been deleted",
+            },
+        }
+        # Broadcast to all clients in the room
+        if room_id in self._room_clients:
+            message_json = json.dumps(notification)
+            for ws, _ in list(self._room_clients[room_id]):
+                try:
+                    await ws.send(message_json)
+                except websockets.exceptions.ConnectionClosed:
+                    pass
+            # Clear room client tracking
+            del self._room_clients[room_id]
+
+    async def _send_delete_room_error(
+        self,
+        websocket: WebSocketServerProtocol,
+        room_id: str,
+        reason: str,
+        error_code: str,
+        transaction_id: str = None,
+    ):
+        """Send a delete_room_failed response."""
+        response = {
+            "type": "delete_room_failed",
+            "data": {
+                "room_id": room_id,
+                "reason": reason,
+                "error_code": error_code,
+            },
+        }
+        if transaction_id:
+            response["data"]["transaction_id"] = transaction_id
         await websocket.send(json.dumps(response))
