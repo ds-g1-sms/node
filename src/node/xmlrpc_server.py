@@ -548,7 +548,9 @@ class XMLRPCServer:
 
         return result
 
-    def commit_delete_room(self, room_id: str, transaction_id: str) -> Dict:
+    def commit_delete_room(
+        self, room_id: str, transaction_id: str, room_name: str = None
+    ) -> Dict:
         """
         Phase 2 (COMMIT): Instruct participant to delete the room.
 
@@ -558,6 +560,7 @@ class XMLRPCServer:
         Args:
             room_id: ID of room to delete
             transaction_id: Transaction identifier from PREPARE
+            room_name: Name of the room (passed from coordinator)
 
         Returns:
             dict: Confirmation with structure:
@@ -572,9 +575,10 @@ class XMLRPCServer:
             f"transaction {transaction_id}"
         )
 
-        # Get room info before deleting for notifications
-        room = self.room_manager.get_room(room_id)
-        room_name = room.room_name if room else "Unknown"
+        # Use provided room_name or try to get it from local room data
+        if room_name is None:
+            room = self.room_manager.get_room(room_id)
+            room_name = room.room_name if room else "Unknown"
 
         result = self.room_manager.commit_deletion(room_id, transaction_id)
 

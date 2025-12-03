@@ -1222,9 +1222,9 @@ class WebSocketServer:
             # Notify room members that deletion is starting
             await self._notify_deletion_initiated(room_id, username)
 
-            # Execute 2PC
+            # Execute 2PC (pass room_name for participant notifications)
             success, error_reason = await self._execute_2pc_deletion(
-                transaction, room_id
+                transaction, room_id, room.room_name
             )
 
             if success:
@@ -1258,13 +1258,16 @@ class WebSocketServer:
                 websocket, room_id, str(e), "INTERNAL_ERROR"
             )
 
-    async def _execute_2pc_deletion(self, transaction, room_id: str) -> tuple:
+    async def _execute_2pc_deletion(
+        self, transaction, room_id: str, room_name: str
+    ) -> tuple:
         """
         Execute the Two-Phase Commit protocol for room deletion.
 
         Args:
             transaction: The DeletionTransaction object
             room_id: The room ID being deleted
+            room_name: The room name for participant notifications
 
         Returns:
             tuple: (success: bool, error_reason: Optional[str])
@@ -1312,10 +1315,10 @@ class WebSocketServer:
             logger.info(f"2PC COMMIT phase for transaction {transaction_id}")
             self.room_manager.transition_to_commit(transaction_id)
 
-            # Send COMMIT to all participants
+            # Send COMMIT to all participants (include room_name for notifications)
             if participants:
                 await self._send_commit_to_participants(
-                    room_id, transaction_id, participants
+                    room_id, transaction_id, participants, room_name
                 )
 
             # Complete deletion on coordinator (this node)
@@ -1415,6 +1418,7 @@ class WebSocketServer:
         room_id: str,
         transaction_id: str,
         participants: List[str],
+        room_name: str,
     ):
         """Send COMMIT to all participant nodes."""
 
@@ -1422,7 +1426,9 @@ class WebSocketServer:
             """Call commit_delete_room on a participant node."""
             try:
                 proxy = ServerProxy(node_addr, allow_none=True)
-                result = proxy.commit_delete_room(room_id, transaction_id)
+                result = proxy.commit_delete_room(
+                    room_id, transaction_id, room_name
+                )
                 return node_id, result
             except Exception as e:
                 logger.error(f"Failed to send COMMIT to {node_id}: {e}")
