@@ -551,8 +551,10 @@ class RoomStateManager:
         """
         room = self._rooms.get(room_id)
 
-        # If room doesn't exist on this node, we can still vote READY
-        # (nothing to delete locally is okay)
+        # 2PC Protocol Note: If room doesn't exist on this participant node,
+        # we vote READY because there's nothing to clean up locally. This is
+        # safe in 2PC - the coordinator only needs all participants to agree
+        # they CAN delete; if there's nothing to delete, that's a valid READY.
         if not room:
             logger.info(
                 f"Room {room_id} not on this node, voting READY for "

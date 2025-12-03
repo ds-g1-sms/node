@@ -177,9 +177,7 @@ def test_message_error_response_from_dict():
 def test_room_has_message_counter():
     """Test that rooms have a message counter."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="creator")
     assert room.message_counter == 0
     assert room.messages == []
 
@@ -187,16 +185,12 @@ def test_room_has_message_counter():
 def test_add_message_to_room():
     """Test adding a message to a room."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="creator")
     # Add creator as a member
     manager.add_member(room.room_id, "creator")
 
     # Add a message
-    message = manager.add_message(
-        room.room_id, "creator", "Hello world!"
-    )
+    message = manager.add_message(room.room_id, "creator", "Hello world!")
 
     assert message is not None
     assert message["username"] == "creator"
@@ -211,9 +205,7 @@ def test_add_message_to_room():
 def test_add_multiple_messages_increments_sequence():
     """Test that sequence numbers increment."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="creator")
     # Add creator as a member
     manager.add_member(room.room_id, "creator")
 
@@ -230,9 +222,7 @@ def test_add_multiple_messages_increments_sequence():
 def test_add_message_non_member_fails():
     """Test that non-members cannot add messages."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="creator")
     # Don't add anyone as a member
 
     # Try to add message as non-member
@@ -254,9 +244,7 @@ def test_add_message_nonexistent_room_fails():
 def test_message_buffer_limit():
     """Test that message buffer respects size limit."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="creator")
     # Add creator as a member
     manager.add_member(room.room_id, "creator")
 
@@ -283,17 +271,13 @@ async def test_websocket_send_message_success():
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a room and add the user
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
 
     mock_ws = MockWebSocket()
 
     # Register alice as a room member
-    ws_server.register_client_room_membership(
-        mock_ws, room.room_id, "alice"
-    )
+    ws_server.register_client_room_membership(mock_ws, room.room_id, "alice")
 
     # Create send_message request
     request = json.dumps(
@@ -313,9 +297,7 @@ async def test_websocket_send_message_success():
     assert len(mock_ws.sent_messages) == 2
 
     # Check for new_message broadcast
-    messages_types = [
-        json.loads(msg)["type"] for msg in mock_ws.sent_messages
-    ]
+    messages_types = [json.loads(msg)["type"] for msg in mock_ws.sent_messages]
     assert "new_message" in messages_types
     assert "message_sent" in messages_types
 
@@ -336,9 +318,7 @@ async def test_websocket_send_message_not_member():
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a room (alice is not a member)
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
 
     mock_ws = MockWebSocket()
 
@@ -370,15 +350,11 @@ async def test_websocket_send_message_empty_content():
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
 
     mock_ws = MockWebSocket()
-    ws_server.register_client_room_membership(
-        mock_ws, room.room_id, "alice"
-    )
+    ws_server.register_client_room_membership(mock_ws, room.room_id, "alice")
 
     request = json.dumps(
         {
@@ -406,15 +382,11 @@ async def test_websocket_send_message_too_long():
     room_manager = RoomStateManager(node_id="test_node")
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
 
     mock_ws = MockWebSocket()
-    ws_server.register_client_room_membership(
-        mock_ws, room.room_id, "alice"
-    )
+    ws_server.register_client_room_membership(mock_ws, room.room_id, "alice")
 
     # Content exceeding 5000 characters
     long_content = "x" * 5001
@@ -474,9 +446,7 @@ async def test_websocket_send_message_broadcast_to_room_members():
     ws_server = WebSocketServer(room_manager, "localhost", 9000)
 
     # Create a room
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
     room_manager.add_member(room.room_id, "bob")
 
@@ -488,12 +458,8 @@ async def test_websocket_send_message_broadcast_to_room_members():
     ws_server.register_client_room_membership(
         creator_ws, room.room_id, "creator"
     )
-    ws_server.register_client_room_membership(
-        alice_ws, room.room_id, "alice"
-    )
-    ws_server.register_client_room_membership(
-        bob_ws, room.room_id, "bob"
-    )
+    ws_server.register_client_room_membership(alice_ws, room.room_id, "alice")
+    ws_server.register_client_room_membership(bob_ws, room.room_id, "bob")
 
     # Alice sends a message
     request = json.dumps(
@@ -536,9 +502,7 @@ def test_xmlrpc_forward_message_success():
     )
 
     # Create a room and add member
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
     room_manager.add_member(room.room_id, "alice")
 
     # Forward a message
@@ -562,9 +526,7 @@ def test_xmlrpc_forward_message_not_member():
         node_address="http://localhost:9090",
     )
 
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
 
     result = server.forward_message(
         room.room_id, "stranger", "Hello!", "client_node"
@@ -602,13 +564,9 @@ def test_xmlrpc_forward_message_empty_content():
         node_address="http://localhost:9090",
     )
 
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
 
-    result = server.forward_message(
-        room.room_id, "creator", "", "client_node"
-    )
+    result = server.forward_message(room.room_id, "creator", "", "client_node")
 
     assert result["success"] is False
     assert result["error_code"] == "INVALID_CONTENT"
@@ -624,9 +582,7 @@ def test_xmlrpc_forward_message_too_long():
         node_address="http://localhost:9090",
     )
 
-    room = room_manager.create_room(
-        room_name="Test Room", creator_id="creator"
-    )
+    room = room_manager.create_room(room_name="Test Room", creator_id="creator")
 
     long_content = "x" * 5001
 
@@ -700,9 +656,7 @@ async def test_client_service_send_message_success():
     service._set_test_mode(mock_websocket=mock_ws)
 
     # send_message is now fire-and-forget, returns None
-    result = await service.send_message(
-        "room-123", "alice", "Hello everyone!"
-    )
+    result = await service.send_message("room-123", "alice", "Hello everyone!")
 
     assert result is None  # Fire-and-forget, no return value
 

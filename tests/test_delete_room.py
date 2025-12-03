@@ -45,18 +45,14 @@ class MockPeerRegistry:
 def test_room_has_state():
     """Test that rooms have a state attribute."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
     assert room.state == RoomState.ACTIVE
 
 
 def test_room_state_transitions():
     """Test room state transitions during 2PC."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     # Start deletion transaction
     transaction = manager.start_deletion_transaction(
@@ -73,14 +69,10 @@ def test_room_state_transitions():
 def test_room_state_rollback():
     """Test room state returns to ACTIVE after rollback."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     # Start deletion transaction
-    transaction = manager.start_deletion_transaction(
-        room.room_id, ["node2"]
-    )
+    transaction = manager.start_deletion_transaction(room.room_id, ["node2"])
     assert room.state == RoomState.DELETION_PENDING
 
     # Rollback
@@ -91,9 +83,7 @@ def test_room_state_rollback():
 def test_room_to_dict_includes_creator():
     """Test that room.to_dict() includes creator_id."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="alice"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="alice")
     room_dict = room.to_dict()
     assert "creator_id" in room_dict
     assert room_dict["creator_id"] == "alice"
@@ -105,9 +95,7 @@ def test_room_to_dict_includes_creator():
 def test_start_deletion_transaction():
     """Test starting a 2PC deletion transaction."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     transaction = manager.start_deletion_transaction(
         room.room_id, ["node2", "node3"]
@@ -135,9 +123,7 @@ def test_start_deletion_transaction_nonexistent_room():
 def test_start_deletion_transaction_already_pending():
     """Test that starting deletion on pending room returns None."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     # Start first transaction
     manager.start_deletion_transaction(room.room_id, ["node2"])
@@ -150,9 +136,7 @@ def test_start_deletion_transaction_already_pending():
 def test_record_vote():
     """Test recording votes from participants."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     transaction = manager.start_deletion_transaction(
         room.room_id, ["node2", "node3"]
@@ -171,9 +155,7 @@ def test_record_vote():
 def test_all_votes_ready():
     """Test checking if all votes are READY."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     transaction = manager.start_deletion_transaction(
         room.room_id, ["node2", "node3"]
@@ -194,9 +176,7 @@ def test_all_votes_ready():
 def test_all_votes_ready_with_abort():
     """Test that one ABORT makes all_votes_ready return False."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     transaction = manager.start_deletion_transaction(
         room.room_id, ["node2", "node3"]
@@ -211,9 +191,7 @@ def test_all_votes_ready_with_abort():
 def test_complete_deletion():
     """Test completing a deletion transaction."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
     room_id = room.room_id
 
     transaction = manager.start_deletion_transaction(room_id, [])
@@ -233,9 +211,7 @@ def test_complete_deletion():
 def test_prepare_for_deletion_ready():
     """Test participant preparing for deletion (voting READY)."""
     manager = RoomStateManager(node_id="participant_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     result = manager.prepare_for_deletion(
         room.room_id, "txn-123", "coordinator_node"
@@ -254,24 +230,21 @@ def test_prepare_for_deletion_nonexistent_room():
         "nonexistent-room", "txn-123", "coordinator_node"
     )
 
-    # Should vote READY since nothing to delete locally
+    # Should vote READY since nothing to delete locally - this is safe in 2PC
+    # as it means no local cleanup is needed on this participant node
     assert result["vote"] == "READY"
 
 
 def test_prepare_for_deletion_already_pending():
     """Test preparing when room is already in deletion pending state."""
     manager = RoomStateManager(node_id="participant_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     # First prepare
     manager.prepare_for_deletion(room.room_id, "txn-1", "coordinator")
 
     # Second prepare should fail
-    result = manager.prepare_for_deletion(
-        room.room_id, "txn-2", "coordinator"
-    )
+    result = manager.prepare_for_deletion(room.room_id, "txn-2", "coordinator")
 
     assert result["vote"] == "ABORT"
     assert "DELETION_PENDING" in result.get("reason", "")
@@ -280,9 +253,7 @@ def test_prepare_for_deletion_already_pending():
 def test_commit_deletion_participant():
     """Test participant committing deletion."""
     manager = RoomStateManager(node_id="participant_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
     room_id = room.room_id
 
     # Prepare first
@@ -298,9 +269,7 @@ def test_commit_deletion_participant():
 def test_rollback_deletion_participant():
     """Test participant rolling back deletion."""
     manager = RoomStateManager(node_id="participant_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
     room_id = room.room_id
 
     # Prepare first
@@ -317,9 +286,7 @@ def test_rollback_deletion_participant():
 def test_can_operate_on_room():
     """Test can_operate_on_room returns False during deletion."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
     # Can operate on active room
     assert manager.can_operate_on_room(room.room_id) is True
@@ -337,13 +304,9 @@ def test_can_operate_on_room():
 def test_xmlrpc_prepare_delete_room():
     """Test XML-RPC prepare_delete_room method."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
 
-    server = XMLRPCServer(
-        manager, "localhost", 9090, "http://localhost:9090"
-    )
+    server = XMLRPCServer(manager, "localhost", 9090, "http://localhost:9090")
 
     result = server.prepare_delete_room(
         room.room_id, "txn-123", "coordinator_node"
@@ -356,14 +319,10 @@ def test_xmlrpc_prepare_delete_room():
 def test_xmlrpc_commit_delete_room():
     """Test XML-RPC commit_delete_room method."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
     room_id = room.room_id
 
-    server = XMLRPCServer(
-        manager, "localhost", 9090, "http://localhost:9090"
-    )
+    server = XMLRPCServer(manager, "localhost", 9090, "http://localhost:9090")
 
     # Prepare first
     server.prepare_delete_room(room_id, "txn-123", "coordinator")
@@ -378,14 +337,10 @@ def test_xmlrpc_commit_delete_room():
 def test_xmlrpc_rollback_delete_room():
     """Test XML-RPC rollback_delete_room method."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="user1"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="user1")
     room_id = room.room_id
 
-    server = XMLRPCServer(
-        manager, "localhost", 9090, "http://localhost:9090"
-    )
+    server = XMLRPCServer(manager, "localhost", 9090, "http://localhost:9090")
 
     # Prepare first
     server.prepare_delete_room(room_id, "txn-123", "coordinator")
@@ -404,20 +359,20 @@ def test_xmlrpc_rollback_delete_room():
 async def test_websocket_delete_room_not_creator():
     """Test that non-creator cannot delete room."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="alice"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="alice")
 
     ws_server = WebSocketServer(manager, "localhost", 8080)
     mock_ws = MockWebSocket()
 
-    request = json.dumps({
-        "type": "delete_room",
-        "data": {
-            "room_id": room.room_id,
-            "username": "bob",  # Not the creator
-        },
-    })
+    request = json.dumps(
+        {
+            "type": "delete_room",
+            "data": {
+                "room_id": room.room_id,
+                "username": "bob",  # Not the creator
+            },
+        }
+    )
 
     await ws_server.process_message(mock_ws, request)
 
@@ -435,13 +390,15 @@ async def test_websocket_delete_room_not_found():
     ws_server = WebSocketServer(manager, "localhost", 8080)
     mock_ws = MockWebSocket()
 
-    request = json.dumps({
-        "type": "delete_room",
-        "data": {
-            "room_id": "nonexistent-room",
-            "username": "alice",
-        },
-    })
+    request = json.dumps(
+        {
+            "type": "delete_room",
+            "data": {
+                "room_id": "nonexistent-room",
+                "username": "alice",
+            },
+        }
+    )
 
     await ws_server.process_message(mock_ws, request)
 
@@ -455,22 +412,22 @@ async def test_websocket_delete_room_not_found():
 async def test_websocket_delete_room_success_no_peers():
     """Test successful deletion with no peer nodes."""
     manager = RoomStateManager(node_id="test_node")
-    room = manager.create_room(
-        room_name="Test Room", creator_id="alice"
-    )
+    room = manager.create_room(room_name="Test Room", creator_id="alice")
     room_id = room.room_id
 
     # No peer registry means no participants
     ws_server = WebSocketServer(manager, "localhost", 8080)
     mock_ws = MockWebSocket()
 
-    request = json.dumps({
-        "type": "delete_room",
-        "data": {
-            "room_id": room_id,
-            "username": "alice",
-        },
-    })
+    request = json.dumps(
+        {
+            "type": "delete_room",
+            "data": {
+                "room_id": room_id,
+                "username": "alice",
+            },
+        }
+    )
 
     await ws_server.process_message(mock_ws, request)
 
@@ -497,13 +454,15 @@ async def test_websocket_delete_room_missing_fields():
     ws_server = WebSocketServer(manager, "localhost", 8080)
     mock_ws = MockWebSocket()
 
-    request = json.dumps({
-        "type": "delete_room",
-        "data": {
-            "room_id": "some-room",
-            # Missing username
-        },
-    })
+    request = json.dumps(
+        {
+            "type": "delete_room",
+            "data": {
+                "room_id": "some-room",
+                # Missing username
+            },
+        }
+    )
 
     await ws_server.process_message(mock_ws, request)
 

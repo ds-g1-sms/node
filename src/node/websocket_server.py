@@ -1374,7 +1374,7 @@ class WebSocketServer:
                 return node_id, None
 
         # Use ThreadPoolExecutor for parallel XML-RPC calls
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=len(participants)) as executor:
             futures = []
             for node_id in participants:
@@ -1428,7 +1428,7 @@ class WebSocketServer:
                 logger.error(f"Failed to send COMMIT to {node_id}: {e}")
                 return node_id, {"success": False, "error": str(e)}
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=len(participants)) as executor:
             futures = []
             for node_id in participants:
@@ -1467,7 +1467,7 @@ class WebSocketServer:
                 logger.error(f"Failed to send ROLLBACK to {node_id}: {e}")
                 return node_id, {"success": False, "error": str(e)}
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=len(participants)) as executor:
             futures = []
             for node_id in participants:
