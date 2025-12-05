@@ -3,6 +3,7 @@ XML-RPC Server for Inter-Node Communication
 
 Handles XML-RPC requests from peer nodes for distributed operations.
 """
+
 import asyncio
 import logging
 import socket
@@ -62,7 +63,7 @@ class XMLRPCServer:
                 self.node_health[node_id] = {
                     "status": "healthy",
                     "consecutive_failures": 0,
-                    "last_active": datetime.now(timezone.utc)
+                    "last_active": datetime.now(timezone.utc),
                 }
 
     def set_broadcast_callback(self, callback: Callable):
@@ -94,7 +95,9 @@ class XMLRPCServer:
             self.receive_member_event_broadcast,
             "receive_member_event_broadcast",
         )
-        self.server.register_function(self.notify_member_disconnect, "notify_member_disconnect")
+        self.server.register_function(
+            self.notify_member_disconnect, "notify_member_disconnect"
+        )
         self.server.register_function(self.heartbeat, "heartbeat")
 
         logger.info(f"XML-RPC server starting on {self.host}:{self.port}")
@@ -518,7 +521,9 @@ class XMLRPCServer:
             "message": "Successfully left room",
         }
 
-    def notify_member_disconnect(self, room_id: str, username: str, member_node_id: str) -> bool:
+    def notify_member_disconnect(
+        self, room_id: str, username: str, member_node_id: str
+    ) -> bool:
         """
         Notify the room that a member has disconnected unexpectedly.
 
@@ -587,7 +592,9 @@ class XMLRPCServer:
                         f"Failed to broadcast member_left to {peer_node_id}: {e}"
                     )
 
-        logger.info(f"XML-RPC: User {username} removed from room {room.room_name} due to node disconnect")
+        logger.info(
+            f"XML-RPC: User {username} removed from room {room.room_name} due to node disconnect"
+        )
         return True
 
     async def heartbeat_monitor(self):
@@ -609,7 +616,9 @@ class XMLRPCServer:
                 if self.peer_registry:
                     node_address = self.peer_registry.get_peer_address(node_id)
                 if not node_address:
-                    logger.warning(f"Node address for {node_id} not found in peer registry")
+                    logger.warning(
+                        f"Node address for {node_id} not found in peer registry"
+                    )
                     continue
 
                 # Perform heartbeat check
@@ -618,16 +627,23 @@ class XMLRPCServer:
                     socket.setdefaulttimeout(heartbeat_timeout)
                     proxy = ServerProxy(node_address)
                     response = proxy.heartbeat()
-                    self.node_health[node_id]['last_active'] = datetime.now(timezone.utc)
-                    logger.debug(f"Heartbeat response from {node_id}: {response}")
+                    self.node_health[node_id]["last_active"] = datetime.now(
+                        timezone.utc
+                    )
+                    logger.debug(
+                        f"Heartbeat response from {node_id}: {response}"
+                    )
 
                 except Exception as e:
-                    self.node_health[node_id]['consecutive_failures'] += 1
+                    self.node_health[node_id]["consecutive_failures"] += 1
                     logger.warning(f"Heartbeat to {node_id} failed: {e}")
 
-                    if self.node_health[node_id]['consecutive_failures'] >= max_failures:
+                    if (
+                        self.node_health[node_id]["consecutive_failures"]
+                        >= max_failures
+                    ):
                         # Mark node as failed
-                        self.node_health[node_id]['status'] = 'failed'
+                        self.node_health[node_id]["status"] = "failed"
                         await self.handle_node_failure(node_id)
                 finally:
                     socket.setdefaulttimeout(old_timeout)
@@ -646,7 +662,7 @@ class XMLRPCServer:
 
         # Find all members associated with that node
         for room_metadata in self.room_manager.list_rooms():
-            room_id = room_metadata['room_id']
+            room_id = room_metadata["room_id"]
             room = self.room_manager.get_room(room_id)
 
             if not room:
@@ -677,7 +693,9 @@ class XMLRPCServer:
                 # Broadcast to local clients via callback
                 if self._broadcast_callback:
                     broadcast_msg = {"type": "member_left", "data": event_data}
-                    self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+                    self._broadcast_callback(
+                        room_id, broadcast_msg, exclude_user=None
+                    )
 
                 # Broadcast to peer nodes via XML-RPC
                 if self._broadcast_callback:
@@ -692,7 +710,6 @@ class XMLRPCServer:
                             logger.error(
                                 f"Failed to broadcast member_left to {peer_node_id}: {e}"
                             )
-
 
     async def cleanup_stale_members(self, room_id: str):
         """
@@ -718,10 +735,10 @@ class XMLRPCServer:
                     self.node_health[user_id] = {
                         "status": "healthy",
                         "consecutive_failures": 0,
-                        "last_active": current_time
+                        "last_active": current_time,
                     }
 
-                last_active = self.node_health[user_id]['last_active']
+                last_active = self.node_health[user_id]["last_active"]
 
                 if current_time - last_active > stale_threshold:
                     stale_members.append(user_id)
@@ -743,15 +760,19 @@ class XMLRPCServer:
                 if self._broadcast_callback:
                     try:
                         self._broadcast_callback(
-                            room_id,
-                            {"type": "member_left", "data": event_data}
+                            room_id, {"type": "member_left", "data": event_data}
                         )
                     except Exception as e:
-                        logger.error("Broadcast failed in stale cleanup: {}".format(e))
+                        logger.error(
+                            "Broadcast failed in stale cleanup: {}".format(e)
+                        )
 
                 # Broadcast to peer nodes
                 if self.peer_registry:
-                    for peer_node_id, peer_addr in self.peer_registry.list_peers().items():
+                    for (
+                        peer_node_id,
+                        peer_addr,
+                    ) in self.peer_registry.list_peers().items():
                         try:
                             proxy = ServerProxy(peer_addr, allow_none=True)
                             proxy.receive_member_event_broadcast(
@@ -761,5 +782,3 @@ class XMLRPCServer:
                             logger.error(
                                 f"Failed to broadcast member_left to {peer_node_id}: {e}"
                             )
-
-

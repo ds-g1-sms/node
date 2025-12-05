@@ -1119,7 +1119,9 @@ class WebSocketServer:
         }
         await websocket.send(json.dumps(response))
 
-    async def handle_client_disconnect(self, websocket: WebSocketServerProtocol):
+    async def handle_client_disconnect(
+        self, websocket: WebSocketServerProtocol
+    ):
         """
         Handle a client disconnection
 
@@ -1145,7 +1147,9 @@ class WebSocketServer:
                 # If room is on this node, handle directly
                 if room_id and room.admin_node == self.room_manager.node_id:
                     self.room_manager.remove_member(room_id, username)
-                    self.broadcast_member_left(room_id, username, "User disconnected")
+                    self.broadcast_member_left(
+                        room_id, username, "User disconnected"
+                    )
                 else:
                     # Else notify admin node
                     admin_node = self.get_room_admin(room_id)
@@ -1156,11 +1160,15 @@ class WebSocketServer:
                         )
                         continue
                     try:
-                        proxy = xmlrpc.client.ServerProxy(admin_node['address'])
-                        proxy.notify_member_disconnect(room_id, username, self.room_manager.node_id)
+                        proxy = xmlrpc.client.ServerProxy(admin_node["address"])
+                        proxy.notify_member_disconnect(
+                            room_id, username, self.room_manager.node_id
+                        )
                         proxy.cleanup_stale_members(room_id)
                     except Exception as e:
-                        logger.error(f"Failed to notify admin node of disconnect: {e}")
+                        logger.error(
+                            f"Failed to notify admin node of disconnect: {e}"
+                        )
 
         # Remove websocket from client-room map
         if websocket in self._room_clients:
@@ -1176,8 +1184,8 @@ class WebSocketServer:
         for room in discovery_result.get("rooms", []):
             if room.get("room_id") == room_id:
                 return {
-                    'node_id': room.get("admin_node"),
-                    'address': room.get("node_address")
+                    "node_id": room.get("admin_node"),
+                    "address": room.get("node_address"),
                 }
         return None
 
@@ -1205,9 +1213,7 @@ class WebSocketServer:
                 "reason": reason,
             },
         }
-        asyncio.create_task(
-            self.broadcast_to_room(room_id, broadcast_msg)
-        )
+        asyncio.create_task(self.broadcast_to_room(room_id, broadcast_msg))
 
         # Broadcast to peer nodes
         # _room_clients maps room_id -> set of (websocket, username) tuples
