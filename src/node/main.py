@@ -70,6 +70,9 @@ async def run_server(
     # Start the WebSocket server
     await ws_server.start()
 
+    # Start the heartbeat monitor loop
+    heartbeat_task = asyncio.create_task(xmlrpc_server.heartbeat_monitor())
+
     logger.info(f"Node server '{node_id}' is ready")
     logger.info(f"WebSocket server listening on ws://{ws_host}:{ws_port}")
     logger.info(f"XML-RPC server listening at {xmlrpc_address}")
@@ -86,6 +89,7 @@ async def run_server(
         await ws_server.stop()
         xmlrpc_server.stop()
         logger.info("Node server stopped")
+        heartbeat_task.cancel()
 
 
 def main():
