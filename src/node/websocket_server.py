@@ -207,10 +207,160 @@ class WebSocketServer:
         except Exception as e:
             logger.error(f"Error handling client {client_id}: {e}")
         finally:
-            # Unregister client from rooms
-            self.unregister_client_room_membership(websocket)
+            # Handle client disconnection
+            await self._handle_client_disconnect(websocket)
             # Unregister client
             self.clients.discard(websocket)
+
+    async def _handle_client_disconnect(
+        self, websocket: WebSocketServerProtocol
+    ):
+        """
+        Handle cleanup when a client disconnects.
+
+        This method:
+        1. Gets all rooms the client was in
+        2. For each room:
+           - If local (we are admin): removes member and broadcasts
+           - If remote: notifies the admin node via XML-RPC
+        3. Unregisters the client from room tracking
+
+        Args:
+            websocket: The WebSocket connection that disconnected
+        """
+        # Get client's room memberships before unregistering
+        if websocket not in self._client_rooms:
+            return
+
+        rooms_copy = list(self._client_rooms.get(websocket, set()))
+
+        for room_id in rooms_copy:
+            # Find the username for this client in this room
+            username = None
+            if room_id in self._room_clients:
+                for ws, user in self._room_clients[room_id]:
+                    if ws == websocket:
+                        username = user
+                        break
+
+            if not username:
+                continue
+
+            # Check if this is a local room (we are the administrator)
+            room = self.room_manager.get_room(room_id)
+
+            if room:
+                # Local room - we are the administrator
+                # Remove member from room
+                self.room_manager.remove_member(room_id, username)
+
+                # Broadcast member_left to remaining members
+                broadcast_msg = {
+                    "type": "member_left",
+                    "data": {
+                        "room_id": room_id,
+                        "username": username,
+                        "reason": "User disconnected",
+                        "member_count": len(room.members),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                }
+                await self.broadcast_to_room(room_id, broadcast_msg, websocket)
+
+                # Also broadcast to peer nodes
+                if self.peer_registry:
+                    peers = self.peer_registry.list_peers()
+                    for peer_node_id, peer_addr in peers.items():
+                        try:
+                            proxy = ServerProxy(peer_addr, allow_none=True)
+                            proxy.receive_member_event_broadcast(
+                                room_id, "member_left", broadcast_msg["data"]
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to broadcast member_left "
+                                f"to {peer_node_id}: {e}"
+                            )
+
+                logger.info(
+                    f"User {username} removed from local room {room_id} "
+                    f"(disconnected)"
+                )
+            else:
+                # Remote room - notify the administrator node
+                await self._notify_admin_of_disconnect(room_id, username)
+
+        # Finally, unregister from room membership tracking
+        self.unregister_client_room_membership(websocket)
+
+    async def _notify_admin_of_disconnect(self, room_id: str, username: str):
+        """
+        Notify the administrator node that a member has disconnected.
+
+        Args:
+            room_id: The room ID
+            username: The username of the disconnected member
+        """
+        if not self.peer_registry:
+            logger.warning(
+                "Cannot notify admin of disconnect: no peer registry"
+            )
+            return
+
+        # Discover rooms to find the admin node
+        local_rooms = self.room_manager.list_rooms()
+        discovery_result = self.peer_registry.discover_global_rooms(local_rooms)
+
+        # Find the room in the discovered rooms
+        target_room = None
+        for room in discovery_result.get("rooms", []):
+            if room.get("room_id") == room_id:
+                target_room = room
+                break
+
+        if not target_room:
+            logger.warning(
+                f"Could not find admin node for room {room_id} "
+                f"to notify disconnect"
+            )
+            return
+
+        # Get the admin node address
+        node_address = target_room.get("node_address")
+        if not node_address:
+            admin_node = target_room.get("admin_node")
+            node_address = self.peer_registry.get_peer_address(admin_node)
+
+        if not node_address:
+            logger.warning(
+                f"Could not get address for admin node of room {room_id}"
+            )
+            return
+
+        # Call XML-RPC to notify the admin of disconnection
+        try:
+            proxy = ServerProxy(node_address, allow_none=True)
+            result = proxy.notify_member_disconnect(
+                room_id,
+                username,
+                self.room_manager.node_id,
+                "User disconnected",
+            )
+            if result.get("success"):
+                logger.info(
+                    f"Notified admin of user {username} disconnect "
+                    f"from room {room_id}"
+                )
+            else:
+                logger.warning(
+                    f"Admin notification failed for disconnect: "
+                    f"{result.get('message')}"
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to notify admin of disconnect for user {username}: "
+                f"{e}"
+            )
 
     async def process_message(
         self, websocket: WebSocketServerProtocol, message: str
@@ -450,8 +600,10 @@ class WebSocketServer:
         already_member = username in room.members
 
         if not already_member:
-            # Add user to the room
-            self.room_manager.add_member(room_id, username)
+            # Add user to the room (local node)
+            self.room_manager.add_member(
+                room_id, username, self.room_manager.node_id
+            )
 
             # Broadcast member_joined to existing members
             broadcast_msg = {
