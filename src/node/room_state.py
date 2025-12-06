@@ -6,11 +6,11 @@ Each node maintains its own list of rooms that it administers.
 """
 
 import logging
-from enum import Enum
-from typing import Dict, List, Optional, Any
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-import uuid
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 HEARTBEAT_INTERVAL = 30  # seconds between heartbeats
 HEARTBEAT_TIMEOUT = 2  # seconds to wait for heartbeat response
 MAX_HEARTBEAT_FAILURES = 2  # missed heartbeats before node considered down
-INACTIVITY_TIMEOUT = 300  # seconds (5 minutes) before member considered stale
+INACTIVITY_TIMEOUT = 900  # seconds (15 minutes) before member considered stale
 CLEANUP_INTERVAL = 60  # seconds between cleanup task runs
 
 
@@ -421,8 +421,7 @@ class RoomStateManager:
             if user_id in room.member_info:
                 del room.member_info[user_id]
             logger.info(
-                f"Removed user {user_id} from room '{room.room_name}' "
-                f"(ID: {room_id})"
+                f"Removed user {user_id} from room '{room.room_name}' (ID: {room_id})"
             )
             return True
         return False
@@ -693,8 +692,7 @@ class RoomStateManager:
 
         if room.state != RoomState.ACTIVE:
             logger.warning(
-                f"Cannot start deletion: Room {room_id} is in state "
-                f"{room.state.value}"
+                f"Cannot start deletion: Room {room_id} is in state {room.state.value}"
             )
             return None
 
@@ -750,8 +748,7 @@ class RoomStateManager:
 
         transaction.votes[node_id] = vote
         logger.info(
-            f"Recorded vote {vote} from {node_id} for transaction "
-            f"{transaction_id}"
+            f"Recorded vote {vote} from {node_id} for transaction {transaction_id}"
         )
         return True
 
@@ -820,8 +817,7 @@ class RoomStateManager:
         del self._deletion_transactions[transaction_id]
 
         logger.info(
-            f"Completed deletion transaction {transaction_id}, "
-            f"room deleted: {success}"
+            f"Completed deletion transaction {transaction_id}, room deleted: {success}"
         )
         return success
 
