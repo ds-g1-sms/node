@@ -882,8 +882,8 @@ class ChatApp(App):
             if reason and reason != "User disconnected":
                 reason_suffix = f" ({reason.lower()})"
             self.call_later(
-                lambda r=reason_suffix: self._add_system_message(
-                    f"{username} left the room{r}", "info"
+                lambda u=username, r=reason_suffix: self._add_system_message(
+                    f"{u} left the room{r}", "info"
                 )
             )
             # Update member list
@@ -931,8 +931,16 @@ class ChatApp(App):
         room_name = data.get("room_name", self.current_room_name)
         asyncio.create_task(self._handle_room_deleted_notification(room_name))
 
-    async def _handle_room_deleted_notification(self, room_name: str) -> None:
-        """Handle the room deleted notification in the UI."""
+    async def _cleanup_room_state(self) -> None:
+        """
+        Clean up room state when leaving, being removed, or room deleted.
+
+        This handles:
+        - Cancelling receive task
+        - Clearing client message buffer
+        - Clearing room state variables
+        - Clearing messages from UI
+        """
         # Cancel receive task
         if self._receive_task:
             self._receive_task.cancel()
@@ -942,7 +950,7 @@ class ChatApp(App):
                 pass
             self._receive_task = None
 
-        # Clear client message buffer (like in _handle_leave_room)
+        # Clear client message buffer
         if self.client:
             self.client.leave_current_room()
 
@@ -961,6 +969,10 @@ class ChatApp(App):
             await messages.remove_children()
         except NoMatches:
             pass
+
+    async def _handle_room_deleted_notification(self, room_name: str) -> None:
+        """Handle the room deleted notification in the UI."""
+        await self._cleanup_room_state()
 
         # Show room list and refresh
         self._show_screen("room-list")
@@ -986,33 +998,7 @@ class ChatApp(App):
             room_name: Name of the room we were removed from
             reason: Reason for removal (e.g., "Connection timeout")
         """
-        # Cancel receive task
-        if self._receive_task:
-            self._receive_task.cancel()
-            try:
-                await self._receive_task
-            except asyncio.CancelledError:
-                pass
-            self._receive_task = None
-
-        # Clear client message buffer
-        if self.client:
-            self.client.leave_current_room()
-
-        # Clear room state
-        self.current_room_id = None
-        self.current_room_name = None
-        self.current_room_creator = None
-        self.current_members = []
-
-        # Clear messages from UI
-        try:
-            messages = self.query_one(
-                "#messages-container", ScrollableContainer
-            )
-            await messages.remove_children()
-        except NoMatches:
-            pass
+        await self._cleanup_room_state()
 
         # Show room list and refresh
         self._show_screen("room-list")
