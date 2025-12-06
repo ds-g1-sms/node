@@ -838,11 +838,8 @@ class ChatApp(App):
             except Exception as err:
                 logger.error("Message receiver error: %s", err)
                 error_msg = str(err)
-                self.call_later(
-                    lambda msg=error_msg: self._add_system_message(
-                        f"Connection lost: {msg}", "error"
-                    )
-                )
+                # Handle connection loss by going back to connection screen
+                asyncio.create_task(self._handle_connection_lost(error_msg))
 
         self._receive_task = asyncio.create_task(receive_loop())
 
@@ -1012,6 +1009,51 @@ class ChatApp(App):
                 f"[red]You were removed from '{room_name}' "
                 f"due to {reason_text}.[/]"
             )
+        except NoMatches:
+            pass
+
+    async def _handle_connection_lost(self, error_msg: str) -> None:
+        """
+        Handle WebSocket connection loss.
+
+        This is called when the connection to the node is lost unexpectedly.
+        Cleans up state and returns to the connection screen with an error.
+
+        Args:
+            error_msg: Error message describing the connection failure
+        """
+        # Clear room state first
+        self.current_room_id = None
+        self.current_room_name = None
+        self.current_room_creator = None
+        self.current_members = []
+        self._deletion_in_progress = False
+
+        # Clear messages from UI if we were in chat
+        try:
+            messages = self.query_one(
+                "#messages-container", ScrollableContainer
+            )
+            await messages.remove_children()
+        except NoMatches:
+            pass
+
+        # Clear client state
+        if self.client:
+            self.client.leave_current_room()
+            try:
+                await self.client.disconnect()
+            except Exception:
+                pass  # Already disconnected
+            self.client = None
+
+        self.username = None
+
+        # Go to connection screen with error message
+        self._show_screen("connection")
+        try:
+            status = self.query_one("#connection-status", Static)
+            status.update(f"[red]Connection lost: {error_msg}[/]")
         except NoMatches:
             pass
 
