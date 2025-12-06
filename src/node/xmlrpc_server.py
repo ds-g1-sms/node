@@ -80,6 +80,12 @@ class XMLRPCServer:
             self.receive_member_event_broadcast,
             "receive_member_event_broadcast",
         )
+        # Member disconnect notification
+        self.server.register_function(
+            self.notify_member_disconnect, "notify_member_disconnect"
+        )
+        # Node health/heartbeat
+        self.server.register_function(self.heartbeat, "heartbeat")
         # 2PC room deletion methods
         self.server.register_function(
             self.prepare_delete_room, "prepare_delete_room"
@@ -210,8 +216,8 @@ class XMLRPCServer:
                 "messages": room.messages,
             }
 
-        # Add user to the room
-        self.room_manager.add_member(room_id, username)
+        # Add user to the room with their node information
+        self.room_manager.add_member(room_id, username, client_node_id)
 
         logger.info(f"XML-RPC: User {username} joined room {room.room_name}")
 
@@ -510,6 +516,123 @@ class XMLRPCServer:
         return {
             "success": True,
             "message": "Successfully left room",
+        }
+
+    # ===== Member Disconnect Notification Methods =====
+
+    def notify_member_disconnect(
+        self,
+        room_id: str,
+        username: str,
+        member_node_id: str,
+        reason: str = "User disconnected",
+    ) -> Dict:
+        """
+        Notify administrator that a member has disconnected.
+
+        This method is exposed via XML-RPC and is called by participant nodes
+        when a client connected to them disconnects from a room hosted here.
+
+        Args:
+            room_id: ID of the room
+            username: Username of disconnected member
+            member_node_id: Node the member was connected to
+            reason: Reason for disconnection
+
+        Returns:
+            dict: Response with structure:
+            {
+                'success': bool,
+                'message': str
+            }
+        """
+        logger.info(
+            f"XML-RPC: notify_member_disconnect called for room {room_id}, "
+            f"user {username} from node {member_node_id}, reason: {reason}"
+        )
+
+        # Get the room
+        room = self.room_manager.get_room(room_id)
+        if not room:
+            logger.warning(f"XML-RPC: Room {room_id} not found")
+            return {
+                "success": False,
+                "message": "Room not found",
+            }
+
+        # Check if user is in the room
+        if username not in room.members:
+            logger.warning(f"XML-RPC: User {username} not in room {room_id}")
+            return {
+                "success": True,  # Not an error - user already gone
+                "message": "User not in room",
+            }
+
+        # Remove user from the room
+        self.room_manager.remove_member(room_id, username)
+
+        logger.info(
+            f"XML-RPC: User {username} removed from room {room.room_name} "
+            f"(reason: {reason})"
+        )
+
+        # Create member_left event data
+        event_data = {
+            "room_id": room_id,
+            "username": username,
+            "reason": reason,
+            "member_count": len(room.members),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Broadcast member_left to local clients via callback
+        if self._broadcast_callback:
+            broadcast_msg = {
+                "type": "member_left",
+                "data": event_data,
+            }
+            self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
+
+        # Broadcast member_left to peer nodes via XML-RPC
+        if self.peer_registry:
+            peers = self.peer_registry.list_peers()
+            for peer_node_id, peer_addr in peers.items():
+                try:
+                    proxy = ServerProxy(peer_addr, allow_none=True)
+                    proxy.receive_member_event_broadcast(
+                        room_id, "member_left", event_data
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to broadcast member_left to {peer_node_id}: "
+                        f"{e}"
+                    )
+
+        return {
+            "success": True,
+            "message": "Member removed successfully",
+        }
+
+    def heartbeat(self) -> Dict:
+        """
+        Respond to heartbeat/health check from administrator node.
+
+        This method is exposed via XML-RPC and is called by administrator
+        nodes to verify this node is alive and healthy.
+
+        Returns:
+            dict: Health status
+            {
+                'status': 'ok',
+                'node_id': str,
+                'timestamp': str
+            }
+        """
+        logger.debug("XML-RPC: heartbeat called")
+        return {
+            "status": "ok",
+            "node_id": self.room_manager.node_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     # ===== Two-Phase Commit (2PC) Methods for Room Deletion =====

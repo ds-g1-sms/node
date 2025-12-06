@@ -19,6 +19,7 @@ help:
 	@echo "  docker-up     - Start Docker containers"
 	@echo "  docker-down   - Stop Docker containers"
 	@echo "  docker-clean  - Remove Docker containers and images"
+	@echo "  docker-logs   - Display Docker logs"
 	@echo "  help          - Display this help message"
 
 ## install: Install Python package and dependencies
@@ -99,3 +100,9 @@ docker-clean:
 	@echo "Cleaning Docker resources..."
 	@docker compose down -v --rmi all
 	@echo "Docker resources cleaned!"
+
+## docker-logs: Display Docker logs
+docker-logs:
+	@echo "Displaying Docker logs..."
+	@docker compose logs -f
+	@echo "Docker log displaying stopped!"

@@ -6,13 +6,120 @@ Each node maintains its own list of rooms that it administers.
 """
 
 import logging
-from enum import Enum
-from typing import Dict, List, Optional
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-import uuid
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Configuration constants for member management
+HEARTBEAT_INTERVAL = 30  # seconds between heartbeats
+HEARTBEAT_TIMEOUT = 2  # seconds to wait for heartbeat response
+MAX_HEARTBEAT_FAILURES = 2  # missed heartbeats before node considered down
+INACTIVITY_TIMEOUT = 900  # seconds (15 minutes) before member considered stale
+CLEANUP_INTERVAL = 60  # seconds between cleanup task runs
+
+
+@dataclass
+class MemberInfo:
+    """
+    Information about a room member.
+
+    Attributes:
+        username: The member's username
+        node_id: The node the member is connected to
+        joined_at: ISO 8601 timestamp when member joined
+        last_activity: ISO 8601 timestamp of last activity
+    """
+
+    username: str
+    node_id: str
+    joined_at: str = ""
+    last_activity: str = ""
+
+    def __post_init__(self):
+        """Initialize timestamps if not set."""
+        now = datetime.now(timezone.utc).isoformat()
+        if not self.joined_at:
+            self.joined_at = now
+        if not self.last_activity:
+            self.last_activity = now
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "username": self.username,
+            "node_id": self.node_id,
+            "joined_at": self.joined_at,
+            "last_activity": self.last_activity,
+        }
+
+    def update_activity(self):
+        """Update the last activity timestamp."""
+        self.last_activity = datetime.now(timezone.utc).isoformat()
+
+
+class NodeStatus(Enum):
+    """Status of a peer node."""
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    FAILED = "failed"
+
+
+@dataclass
+class NodeHealth:
+    """
+    Health tracking for a peer node.
+
+    Attributes:
+        node_id: The node's unique identifier
+        last_heartbeat: ISO 8601 timestamp of last successful heartbeat
+        status: Current health status
+        consecutive_failures: Number of consecutive heartbeat failures
+    """
+
+    node_id: str
+    last_heartbeat: str = ""
+    status: NodeStatus = NodeStatus.HEALTHY
+    consecutive_failures: int = 0
+
+    def __post_init__(self):
+        """Initialize last heartbeat if not set."""
+        if not self.last_heartbeat:
+            self.last_heartbeat = datetime.now(timezone.utc).isoformat()
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "node_id": self.node_id,
+            "last_heartbeat": self.last_heartbeat,
+            "status": self.status.value,
+            "consecutive_failures": self.consecutive_failures,
+        }
+
+    def record_success(self):
+        """Record a successful heartbeat."""
+        self.last_heartbeat = datetime.now(timezone.utc).isoformat()
+        self.status = NodeStatus.HEALTHY
+        self.consecutive_failures = 0
+
+    def record_failure(self) -> bool:
+        """
+        Record a failed heartbeat.
+
+        Returns:
+            True if the node should now be considered failed.
+        """
+        self.consecutive_failures += 1
+        if self.consecutive_failures >= MAX_HEARTBEAT_FAILURES:
+            self.status = NodeStatus.FAILED
+            return True
+        else:
+            self.status = NodeStatus.DEGRADED
+            return False
 
 
 class RoomState(Enum):
@@ -103,7 +210,8 @@ class Room:
         description: Optional room description
         creator_id: ID of the user who created the room
         admin_node: Identifier of the node administering this room
-        members: Set of user IDs currently in the room
+        members: Set of user IDs currently in the room (backward compatible)
+        member_info: Dict of username -> MemberInfo for detailed tracking
         created_at: ISO 8601 timestamp when the room was created
         message_counter: Counter for assigning sequence numbers to messages
         messages: List of messages in the room (in-memory buffer)
@@ -120,11 +228,14 @@ class Room:
     message_counter: int = 0
     messages: list = None
     state: RoomState = RoomState.ACTIVE
+    member_info: Dict[str, MemberInfo] = None
 
     def __post_init__(self):
-        """Initialize the messages list if not set."""
+        """Initialize the messages list and member_info dict if not set."""
         if self.messages is None:
             self.messages = []
+        if self.member_info is None:
+            self.member_info = {}
 
     def to_dict(self) -> Dict:
         """Convert room to dictionary for serialization."""
@@ -136,6 +247,18 @@ class Room:
             "admin_node": self.admin_node,
             "creator_id": self.creator_id,
         }
+
+    def get_members_by_node(self, node_id: str) -> List[str]:
+        """Get list of usernames for members connected to a specific node."""
+        return [
+            username
+            for username, info in self.member_info.items()
+            if info.node_id == node_id
+        ]
+
+    def get_all_nodes(self) -> List[str]:
+        """Get list of all unique node IDs with members in this room."""
+        return list(set(info.node_id for info in self.member_info.values()))
 
 
 class RoomStateManager:
@@ -159,6 +282,8 @@ class RoomStateManager:
         # 2PC transaction tracking
         self._deletion_transactions: Dict[str, DeletionTransaction] = {}
         self._prepared_transactions: Dict[str, PreparedTransaction] = {}
+        # Node health tracking
+        self._node_health: Dict[str, NodeHealth] = {}
         logger.info(f"RoomStateManager initialized for node: {node_id}")
 
     def create_room(
@@ -243,13 +368,16 @@ class RoomStateManager:
             return True
         return False
 
-    def add_member(self, room_id: str, user_id: str) -> bool:
+    def add_member(
+        self, room_id: str, user_id: str, node_id: str = None
+    ) -> bool:
         """
         Add a member to a room.
 
         Args:
             room_id: The room ID
             user_id: The user ID to add
+            node_id: The node the member is connected to (defaults to local)
 
         Returns:
             True if member was added, False if room doesn't exist
@@ -257,9 +385,20 @@ class RoomStateManager:
         room = self._rooms.get(room_id)
         if room:
             room.members.add(user_id)
+            # Track member info with node_id
+            member_node = node_id if node_id else self.node_id
+            room.member_info[user_id] = MemberInfo(
+                username=user_id, node_id=member_node
+            )
+            # Initialize node health tracking if needed
+            if member_node != self.node_id:
+                if member_node not in self._node_health:
+                    self._node_health[member_node] = NodeHealth(
+                        node_id=member_node
+                    )
             logger.info(
                 f"Added user {user_id} to room '{room.room_name}' "
-                f"(ID: {room_id})"
+                f"(ID: {room_id}) from node {member_node}"
             )
             return True
         return False
@@ -278,12 +417,191 @@ class RoomStateManager:
         room = self._rooms.get(room_id)
         if room and user_id in room.members:
             room.members.remove(user_id)
+            # Also remove from member_info
+            if user_id in room.member_info:
+                del room.member_info[user_id]
             logger.info(
-                f"Removed user {user_id} from room '{room.room_name}' "
-                f"(ID: {room_id})"
+                f"Removed user {user_id} from room '{room.room_name}' (ID: {room_id})"
             )
             return True
         return False
+
+    def get_member_info(
+        self, room_id: str, user_id: str
+    ) -> Optional[MemberInfo]:
+        """
+        Get member info for a user in a room.
+
+        Args:
+            room_id: The room ID
+            user_id: The user ID
+
+        Returns:
+            MemberInfo if found, None otherwise
+        """
+        room = self._rooms.get(room_id)
+        if room:
+            return room.member_info.get(user_id)
+        return None
+
+    def update_member_activity(self, room_id: str, user_id: str) -> bool:
+        """
+        Update the last activity timestamp for a member.
+
+        Args:
+            room_id: The room ID
+            user_id: The user ID
+
+        Returns:
+            True if updated, False otherwise
+        """
+        room = self._rooms.get(room_id)
+        if room and user_id in room.member_info:
+            room.member_info[user_id].update_activity()
+            return True
+        return False
+
+    def get_members_by_node(self, room_id: str, node_id: str) -> List[str]:
+        """
+        Get all members in a room connected to a specific node.
+
+        Args:
+            room_id: The room ID
+            node_id: The node ID
+
+        Returns:
+            List of usernames
+        """
+        room = self._rooms.get(room_id)
+        if room:
+            return room.get_members_by_node(node_id)
+        return []
+
+    def get_stale_members(
+        self, room_id: str, timeout_seconds: int = INACTIVITY_TIMEOUT
+    ) -> List[str]:
+        """
+        Get members who haven't had activity within the timeout period.
+
+        Args:
+            room_id: The room ID
+            timeout_seconds: Inactivity timeout in seconds
+
+        Returns:
+            List of stale usernames
+        """
+        room = self._rooms.get(room_id)
+        if not room:
+            return []
+
+        stale_members = []
+        now = datetime.now(timezone.utc)
+
+        for username, info in room.member_info.items():
+            try:
+                last_activity = datetime.fromisoformat(
+                    info.last_activity.replace("Z", "+00:00")
+                )
+                if (now - last_activity).total_seconds() > timeout_seconds:
+                    stale_members.append(username)
+            except (ValueError, AttributeError):
+                # If we can't parse the timestamp, consider it stale
+                stale_members.append(username)
+
+        return stale_members
+
+    # Node Health Management
+
+    def get_node_health(self, node_id: str) -> Optional[NodeHealth]:
+        """Get health info for a node."""
+        return self._node_health.get(node_id)
+
+    def get_all_member_nodes(self) -> Dict[str, str]:
+        """
+        Get all nodes that have members in rooms administered by this node.
+
+        Returns:
+            Dict mapping node_id -> node_address (placeholder)
+        """
+        nodes = set()
+        for room in self._rooms.values():
+            for info in room.member_info.values():
+                if info.node_id != self.node_id:
+                    nodes.add(info.node_id)
+        return {node: node for node in nodes}
+
+    def record_node_heartbeat_success(self, node_id: str):
+        """Record a successful heartbeat from a node."""
+        if node_id in self._node_health:
+            self._node_health[node_id].record_success()
+            logger.debug(f"Heartbeat success for node {node_id}")
+        else:
+            self._node_health[node_id] = NodeHealth(node_id=node_id)
+
+    def record_node_heartbeat_failure(self, node_id: str) -> bool:
+        """
+        Record a failed heartbeat for a node.
+
+        Args:
+            node_id: The node ID
+
+        Returns:
+            True if the node is now considered failed
+        """
+        if node_id not in self._node_health:
+            self._node_health[node_id] = NodeHealth(node_id=node_id)
+
+        is_failed = self._node_health[node_id].record_failure()
+        if is_failed:
+            logger.warning(f"Node {node_id} marked as FAILED after heartbeat")
+        else:
+            failures = self._node_health[node_id].consecutive_failures
+            logger.debug(f"Heartbeat failure #{failures} for node {node_id}")
+        return is_failed
+
+    def get_failed_nodes(self) -> List[str]:
+        """Get list of nodes marked as failed."""
+        return [
+            node_id
+            for node_id, health in self._node_health.items()
+            if health.status == NodeStatus.FAILED
+        ]
+
+    def get_rooms_with_node_members(self, node_id: str) -> List[str]:
+        """
+        Get all rooms that have members from a specific node.
+
+        Args:
+            node_id: The node ID
+
+        Returns:
+            List of room IDs
+        """
+        rooms = []
+        for room_id, room in self._rooms.items():
+            for info in room.member_info.values():
+                if info.node_id == node_id:
+                    rooms.append(room_id)
+                    break
+        return rooms
+
+    def remove_all_members_from_node(self, node_id: str) -> List[tuple]:
+        """
+        Remove all members from a specific node from all rooms.
+
+        Args:
+            node_id: The node ID
+
+        Returns:
+            List of (room_id, username) tuples of removed members
+        """
+        removed = []
+        for room_id, room in self._rooms.items():
+            members_to_remove = room.get_members_by_node(node_id)
+            for username in members_to_remove:
+                self.remove_member(room_id, username)
+                removed.append((room_id, username))
+        return removed
 
     def get_room_count(self) -> int:
         """Get the total number of rooms on this node."""
@@ -374,8 +692,7 @@ class RoomStateManager:
 
         if room.state != RoomState.ACTIVE:
             logger.warning(
-                f"Cannot start deletion: Room {room_id} is in state "
-                f"{room.state.value}"
+                f"Cannot start deletion: Room {room_id} is in state {room.state.value}"
             )
             return None
 
@@ -431,8 +748,7 @@ class RoomStateManager:
 
         transaction.votes[node_id] = vote
         logger.info(
-            f"Recorded vote {vote} from {node_id} for transaction "
-            f"{transaction_id}"
+            f"Recorded vote {vote} from {node_id} for transaction {transaction_id}"
         )
         return True
 
@@ -501,8 +817,7 @@ class RoomStateManager:
         del self._deletion_transactions[transaction_id]
 
         logger.info(
-            f"Completed deletion transaction {transaction_id}, "
-            f"room deleted: {success}"
+            f"Completed deletion transaction {transaction_id}, room deleted: {success}"
         )
         return success
 

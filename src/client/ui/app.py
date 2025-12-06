@@ -696,6 +696,7 @@ class ChatApp(App):
             status.update(f"[green]Room '{room_name}' created![/]")
 
             # Go back to room list and refresh
+            self._show_screen("room-list")
             await self._refresh_rooms(global_discovery=True)
 
         except Exception as e:
@@ -838,11 +839,8 @@ class ChatApp(App):
             except Exception as err:
                 logger.error("Message receiver error: %s", err)
                 error_msg = str(err)
-                self.call_later(
-                    lambda msg=error_msg: self._add_system_message(
-                        f"Connection lost: {msg}", "error"
-                    )
-                )
+                # Handle connection loss by going back to connection screen
+                asyncio.create_task(self._handle_connection_lost(error_msg))
 
         self._receive_task = asyncio.create_task(receive_loop())
 
@@ -868,10 +866,22 @@ class ChatApp(App):
     def _on_member_left(self, data: Dict[str, Any]) -> None:
         """Callback when a member leaves the room."""
         username = data.get("username", "Unknown")
-        if username != self.username:
+        reason = data.get("reason", "")
+
+        if username == self.username:
+            # We were removed from the room (inactivity, node failure, etc.)
+            room_name = self.current_room_name or "the room"
+            asyncio.create_task(
+                self._handle_removed_from_room(room_name, reason)
+            )
+        else:
+            # Another member left
+            reason_suffix = ""
+            if reason and reason != "User disconnected":
+                reason_suffix = f" ({reason.lower()})"
             self.call_later(
-                lambda: self._add_system_message(
-                    f"{username} left the room", "info"
+                lambda u=username, r=reason_suffix: self._add_system_message(
+                    f"{u} left the room{r}", "info"
                 )
             )
             # Update member list
@@ -919,8 +929,16 @@ class ChatApp(App):
         room_name = data.get("room_name", self.current_room_name)
         asyncio.create_task(self._handle_room_deleted_notification(room_name))
 
-    async def _handle_room_deleted_notification(self, room_name: str) -> None:
-        """Handle the room deleted notification in the UI."""
+    async def _cleanup_room_state(self) -> None:
+        """
+        Clean up room state when leaving, being removed, or room deleted.
+
+        This handles:
+        - Cancelling receive task
+        - Clearing client message buffer
+        - Clearing room state variables
+        - Clearing messages from UI
+        """
         # Cancel receive task
         if self._receive_task:
             self._receive_task.cancel()
@@ -930,7 +948,7 @@ class ChatApp(App):
                 pass
             self._receive_task = None
 
-        # Clear client message buffer (like in _handle_leave_room)
+        # Clear client message buffer
         if self.client:
             self.client.leave_current_room()
 
@@ -950,6 +968,10 @@ class ChatApp(App):
         except NoMatches:
             pass
 
+    async def _handle_room_deleted_notification(self, room_name: str) -> None:
+        """Handle the room deleted notification in the UI."""
+        await self._cleanup_room_state()
+
         # Show room list and refresh
         self._show_screen("room-list")
         await self._refresh_rooms(global_discovery=True)
@@ -958,6 +980,81 @@ class ChatApp(App):
         try:
             status = self.query_one("#room-status", Static)
             status.update(f"[yellow]Room '{room_name}' has been deleted.[/]")
+        except NoMatches:
+            pass
+
+    async def _handle_removed_from_room(
+        self, room_name: str, reason: str
+    ) -> None:
+        """
+        Handle being removed from a room by the administrator.
+
+        This is called when the current user is removed due to inactivity,
+        node failure, or other reasons.
+
+        Args:
+            room_name: Name of the room we were removed from
+            reason: Reason for removal (e.g., "Inactivity")
+        """
+        await self._cleanup_room_state()
+
+        # Show room list and refresh
+        self._show_screen("room-list")
+        await self._refresh_rooms(global_discovery=True)
+
+        # Show notification with reason
+        try:
+            status = self.query_one("#room-status", Static)
+            reason_text = reason.lower() if reason else "unknown reason"
+            status.update(
+                f"[red]You were removed from '{room_name}' "
+                f"due to {reason_text}.[/]"
+            )
+        except NoMatches:
+            pass
+
+    async def _handle_connection_lost(self, error_msg: str) -> None:
+        """
+        Handle WebSocket connection loss.
+
+        This is called when the connection to the node is lost unexpectedly.
+        Cleans up state and returns to the connection screen with an error.
+
+        Args:
+            error_msg: Error message describing the connection failure
+        """
+        # Clear room state first
+        self.current_room_id = None
+        self.current_room_name = None
+        self.current_room_creator = None
+        self.current_members = []
+        self._deletion_in_progress = False
+
+        # Clear messages from UI if we were in chat
+        try:
+            messages = self.query_one(
+                "#messages-container", ScrollableContainer
+            )
+            await messages.remove_children()
+        except NoMatches:
+            pass
+
+        # Clear client state
+        if self.client:
+            self.client.leave_current_room()
+            try:
+                await self.client.disconnect()
+            except Exception:
+                pass  # Already disconnected
+            self.client = None
+
+        self.username = None
+
+        # Go to connection screen with error message
+        self._show_screen("connection")
+        try:
+            status = self.query_one("#connection-status", Static)
+            status.update(f"[red]Connection lost: {error_msg}[/]")
         except NoMatches:
             pass
 
