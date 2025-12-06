@@ -868,10 +868,22 @@ class ChatApp(App):
     def _on_member_left(self, data: Dict[str, Any]) -> None:
         """Callback when a member leaves the room."""
         username = data.get("username", "Unknown")
-        if username != self.username:
+        reason = data.get("reason", "")
+
+        if username == self.username:
+            # We were removed from the room (inactivity, node failure, etc.)
+            room_name = self.current_room_name or "the room"
+            asyncio.create_task(
+                self._handle_removed_from_room(room_name, reason)
+            )
+        else:
+            # Another member left
+            reason_suffix = ""
+            if reason and reason != "User disconnected":
+                reason_suffix = f" ({reason.lower()})"
             self.call_later(
-                lambda: self._add_system_message(
-                    f"{username} left the room", "info"
+                lambda r=reason_suffix: self._add_system_message(
+                    f"{username} left the room{r}", "info"
                 )
             )
             # Update member list
@@ -958,6 +970,62 @@ class ChatApp(App):
         try:
             status = self.query_one("#room-status", Static)
             status.update(f"[yellow]Room '{room_name}' has been deleted.[/]")
+        except NoMatches:
+            pass
+
+    async def _handle_removed_from_room(
+        self, room_name: str, reason: str
+    ) -> None:
+        """
+        Handle being removed from a room by the administrator.
+
+        This is called when the current user is removed due to inactivity,
+        node failure, or other reasons.
+
+        Args:
+            room_name: Name of the room we were removed from
+            reason: Reason for removal (e.g., "Connection timeout")
+        """
+        # Cancel receive task
+        if self._receive_task:
+            self._receive_task.cancel()
+            try:
+                await self._receive_task
+            except asyncio.CancelledError:
+                pass
+            self._receive_task = None
+
+        # Clear client message buffer
+        if self.client:
+            self.client.leave_current_room()
+
+        # Clear room state
+        self.current_room_id = None
+        self.current_room_name = None
+        self.current_room_creator = None
+        self.current_members = []
+
+        # Clear messages from UI
+        try:
+            messages = self.query_one(
+                "#messages-container", ScrollableContainer
+            )
+            await messages.remove_children()
+        except NoMatches:
+            pass
+
+        # Show room list and refresh
+        self._show_screen("room-list")
+        await self._refresh_rooms(global_discovery=True)
+
+        # Show notification with reason
+        try:
+            status = self.query_one("#room-status", Static)
+            reason_text = reason.lower() if reason else "unknown reason"
+            status.update(
+                f"[red]You were removed from '{room_name}' "
+                f"due to {reason_text}.[/]"
+            )
         except NoMatches:
             pass
 
