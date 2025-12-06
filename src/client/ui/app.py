@@ -696,6 +696,7 @@ class ChatApp(App):
             status.update(f"[green]Room '{room_name}' created![/]")
 
             # Go back to room list and refresh
+            self._show_screen("room-list")
             await self._refresh_rooms(global_discovery=True)
 
         except Exception as e:
