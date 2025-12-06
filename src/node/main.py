@@ -324,7 +324,7 @@ async def stale_member_cleanup(
                     event_data = {
                         "room_id": room_id,
                         "username": username,
-                        "reason": "Connection timeout",
+                        "reason": "Inactivity",
                         "member_count": member_count,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     }

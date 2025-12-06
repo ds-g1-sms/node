@@ -996,7 +996,7 @@ class ChatApp(App):
 
         Args:
             room_name: Name of the room we were removed from
-            reason: Reason for removal (e.g., "Connection timeout")
+            reason: Reason for removal (e.g., "Inactivity")
         """
         await self._cleanup_room_state()
 
