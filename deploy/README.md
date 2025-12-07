@@ -1,14 +1,30 @@
 # Deployment Configurations
 
-This directory contains deployment configurations and scripts.
+⚠️ **Note**: This directory contains legacy information. For production deployment, see the `../deployment/` directory.
 
-## Purpose
+## Production Deployment
 
-Configuration files for:
-- Docker containerization
-- Kubernetes manifests
-- Environment configurations
-- Deployment scripts
+For production multi-host deployment using Docker Swarm, see:
+
+**📁 [../deployment/](../deployment/)** - Complete production deployment infrastructure with:
+- Docker Swarm orchestration
+- Multi-host deployment configuration
+- Automated deployment scripts
+- Comprehensive documentation
+- Health checks and monitoring
+- Operations manual
+
+Quick Start for Production:
+```bash
+cd deployment
+./scripts/deploy.sh -e .env.prod -v
+```
+
+See [deployment/docs/DEPLOYMENT.md](../deployment/docs/DEPLOYMENT.md) for complete instructions.
+
+---
+
+## Development Environment (Legacy)
 
 ## Development Environment
 
