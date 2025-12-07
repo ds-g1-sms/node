@@ -8,7 +8,6 @@ This manual provides guidance for day-to-day operations of the distributed chat 
 - [Monitoring](#monitoring)
 - [Log Management](#log-management)
 - [Service Management](#service-management)
-- [Scaling Operations](#scaling-operations)
 - [Updates and Rollbacks](#updates-and-rollbacks)
 - [Backup and Recovery](#backup-and-recovery)
 - [Security Operations](#security-operations)
@@ -214,9 +213,6 @@ docker stack deploy -c deployment/docker-compose.prod.yml chat-system
 ### Stopping Services
 
 ```bash
-# Stop specific service
-docker service scale chat-system_node1=0
-
 # Stop all services (remove stack)
 docker stack rm chat-system
 ```
@@ -245,41 +241,6 @@ docker service ps chat-system_node1
 # View service logs
 docker service logs chat-system_node1
 ```
-
-## Scaling Operations
-
-### Scale Up
-
-Add more replicas to handle increased load:
-
-```bash
-# Scale node1 to 2 replicas
-./scripts/scale.sh -n node1 -r 2 -v
-
-# Or using docker command
-docker service scale chat-system_node1=2
-```
-
-**Note**: Ensure you have machines with appropriate labels for additional replicas.
-
-### Scale Down
-
-Reduce replicas to save resources:
-
-```bash
-# Scale back to 1 replica
-./scripts/scale.sh -n node1 -r 1 -v
-
-# Or using docker command
-docker service scale chat-system_node1=1
-```
-
-### Scaling Best Practices
-
-1. **Monitor Load**: Scale based on actual metrics, not assumptions
-2. **Gradual Scaling**: Scale one node at a time
-3. **Verify Health**: Use `-v` flag to verify scaling completes successfully
-4. **Consider Dependencies**: Ensure peer nodes are informed of changes
 
 ## Updates and Rollbacks
 
@@ -509,11 +470,6 @@ docker stats $(docker ps -q -f name=node)
 ./scripts/logs.sh -n node1 -t 200
 ```
 
-4. **Scale if needed**:
-```bash
-./scripts/scale.sh -n node1 -r 2 -v
-```
-
 ### Network Issues
 
 1. **Test connectivity**:
@@ -596,9 +552,6 @@ docker stack services chat-system
 
 # Restart service
 docker service update --force chat-system_node1
-
-# Scale service
-./scripts/scale.sh -n node1 -r 2
 
 # Update image
 docker service update --image user/chat-node:v2 chat-system_node1

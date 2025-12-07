@@ -264,9 +264,6 @@ volumes:
 #   docker service logs -f chat-system_node2
 #   docker service logs -f chat-system_node3
 #
-# Scale a service (add more replicas):
-#   docker service scale chat-system_node1=2
-#
 # Update service (rolling update):
 #   docker service update --image ${REGISTRY}/chat-node:v2 chat-system_node1
 #

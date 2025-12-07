@@ -51,8 +51,7 @@ deployment/
 ├── scripts/                        # Operational scripts
 │   ├── deploy.sh                   # Automated deployment
 │   ├── health-check.sh             # Health verification
-│   ├── logs.sh                     # Log aggregation
-│   └── scale.sh                    # Scaling operations
+│   └── logs.sh                     # Log aggregation
 └── docs/                           # Documentation
     ├── DEPLOYMENT.md               # Deployment guide
     ├── OPERATIONS.md               # Operations manual
@@ -126,9 +125,6 @@ Comprehensive documentation is available in the `docs/` directory:
 
 # View logs
 ./scripts/logs.sh -f
-
-# Scale service
-./scripts/scale.sh -n node1 -r 2
 
 # Manual operations
 docker stack services chat-system

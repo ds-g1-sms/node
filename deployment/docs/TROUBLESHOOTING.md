@@ -419,12 +419,7 @@ docker service update \
   chat-system_node1
 ```
 
-2. **Scale horizontally**:
-```bash
-./scripts/scale.sh -n node1 -r 2 -v
-```
-
-3. **Optimize application**:
+2. **Optimize application**:
 ```bash
 # Check for inefficient loops or operations in logs
 ./scripts/logs.sh -n node1 -f | grep -i "processing"
