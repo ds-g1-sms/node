@@ -94,7 +94,9 @@ def create_message_error(
     }
 
 
-def create_new_message_broadcast(message_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_new_message_broadcast(
+    message_data: Dict[str, Any],
+) -> Dict[str, Any]:
     """
     Create a new_message broadcast.
 

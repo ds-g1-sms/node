@@ -41,7 +41,9 @@ def broadcast_to_peers(
 
         try:
             proxy = ServerProxy(peer_addr, allow_none=True)
-            proxy.receive_member_event_broadcast(room_id, event_type, event_data)
+            proxy.receive_member_event_broadcast(
+                room_id, event_type, event_data
+            )
             logger.debug(f"Broadcasted {event_type} to peer {peer_node_id}")
         except Exception as e:
             logger.error(
@@ -72,6 +74,4 @@ def broadcast_message_to_peers(
             proxy.receive_message_broadcast(room_id, message_data)
             logger.debug(f"Broadcasted message to peer {peer_node_id}")
         except Exception as e:
-            logger.error(
-                f"Failed to broadcast message to {peer_node_id}: {e}"
-            )
+            logger.error(f"Failed to broadcast message to {peer_node_id}: {e}")

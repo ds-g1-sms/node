@@ -7,11 +7,13 @@ Handles XML-RPC requests from peer nodes for distributed operations.
 import logging
 from datetime import datetime, timezone
 from xmlrpc.server import SimpleXMLRPCServer
-from xmlrpc.client import ServerProxy
 from threading import Thread
 from typing import List, Dict, Callable, Optional
 
 from .room_state import RoomStateManager
+from .schemas.events import create_member_joined_event, create_member_left_event
+from .utils.broadcast import broadcast_to_peers, broadcast_message_to_peers
+from .utils.validation import validate_message_content
 
 logger = logging.getLogger(__name__)
 
@@ -222,12 +224,12 @@ class XMLRPCServer:
         logger.info(f"XML-RPC: User {username} joined room {room.room_name}")
 
         # Create member_joined event data
-        event_data = {
-            "room_id": room_id,
-            "username": username,
-            "member_count": len(room.members),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+        event_data = create_member_joined_event(
+            room_id=room_id,
+            username=username,
+            member_count=len(room.members),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
 
         # Broadcast member_joined to local clients via callback
         if self._broadcast_callback:
@@ -238,18 +240,9 @@ class XMLRPCServer:
             self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
 
         # Broadcast member_joined to peer nodes via XML-RPC
-        if self.peer_registry:
-            peers = self.peer_registry.list_peers()
-            for peer_node_id, peer_addr in peers.items():
-                try:
-                    proxy = ServerProxy(peer_addr, allow_none=True)
-                    proxy.receive_member_event_broadcast(
-                        room_id, "member_joined", event_data
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to broadcast member_joined to {peer_node_id}: {e}"
-                    )
+        broadcast_to_peers(
+            self.peer_registry, room_id, "member_joined", event_data
+        )
 
         return {
             "success": True,
@@ -297,17 +290,11 @@ class XMLRPCServer:
         )
 
         # Validate message content
-        if not content:
+        is_valid, error_msg = validate_message_content(content)
+        if not is_valid:
             return {
                 "success": False,
-                "error": "Message content cannot be empty",
-                "error_code": "INVALID_CONTENT",
-            }
-
-        if len(content) > 5000:
-            return {
-                "success": False,
-                "error": "Message content too long (max 5000 characters)",
+                "error": error_msg,
                 "error_code": "INVALID_CONTENT",
             }
 
@@ -348,16 +335,7 @@ class XMLRPCServer:
             self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
 
         # Broadcast to peer nodes via XML-RPC
-        if self.peer_registry:
-            peers = self.peer_registry.list_peers()
-            for peer_node_id, peer_addr in peers.items():
-                try:
-                    proxy = ServerProxy(peer_addr, allow_none=True)
-                    proxy.receive_message_broadcast(room_id, message)
-                except Exception as e:
-                    logger.error(
-                        f"Failed to broadcast message to {peer_node_id}: {e}"
-                    )
+        broadcast_message_to_peers(self.peer_registry, room_id, message)
 
         logger.info(
             f"XML-RPC: Message #{message['sequence_number']} "
@@ -484,12 +462,12 @@ class XMLRPCServer:
         logger.info(f"XML-RPC: User {username} left room {room.room_name}")
 
         # Create member_left event data
-        event_data = {
-            "room_id": room_id,
-            "username": username,
-            "member_count": len(room.members),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+        event_data = create_member_left_event(
+            room_id=room_id,
+            username=username,
+            member_count=len(room.members),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
 
         # Broadcast member_left to local clients via callback
         if self._broadcast_callback:
@@ -500,18 +478,9 @@ class XMLRPCServer:
             self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
 
         # Broadcast member_left to peer nodes via XML-RPC
-        if self.peer_registry:
-            peers = self.peer_registry.list_peers()
-            for peer_node_id, peer_addr in peers.items():
-                try:
-                    proxy = ServerProxy(peer_addr, allow_none=True)
-                    proxy.receive_member_event_broadcast(
-                        room_id, "member_left", event_data
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to broadcast member_left to {peer_node_id}: {e}"
-                    )
+        broadcast_to_peers(
+            self.peer_registry, room_id, "member_left", event_data
+        )
 
         return {
             "success": True,
@@ -577,13 +546,13 @@ class XMLRPCServer:
         )
 
         # Create member_left event data
-        event_data = {
-            "room_id": room_id,
-            "username": username,
-            "reason": reason,
-            "member_count": len(room.members),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+        event_data = create_member_left_event(
+            room_id=room_id,
+            username=username,
+            member_count=len(room.members),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            reason=reason,
+        )
 
         # Broadcast member_left to local clients via callback
         if self._broadcast_callback:
@@ -594,19 +563,9 @@ class XMLRPCServer:
             self._broadcast_callback(room_id, broadcast_msg, exclude_user=None)
 
         # Broadcast member_left to peer nodes via XML-RPC
-        if self.peer_registry:
-            peers = self.peer_registry.list_peers()
-            for peer_node_id, peer_addr in peers.items():
-                try:
-                    proxy = ServerProxy(peer_addr, allow_none=True)
-                    proxy.receive_member_event_broadcast(
-                        room_id, "member_left", event_data
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to broadcast member_left to {peer_node_id}: "
-                        f"{e}"
-                    )
+        broadcast_to_peers(
+            self.peer_registry, room_id, "member_left", event_data
+        )
 
         return {
             "success": True,
