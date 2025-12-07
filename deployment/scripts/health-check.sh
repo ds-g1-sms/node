@@ -121,7 +121,11 @@ check_service_running() {
         return 1
     fi
     
-    if echo "$replicas" | grep -q "^1/1"; then
+    # Parse replicas in format "running/desired"
+    local running=$(echo "$replicas" | cut -d'/' -f1)
+    local desired=$(echo "$replicas" | cut -d'/' -f2)
+    
+    if [ "$running" = "$desired" ] && [ "$running" -gt 0 ]; then
         print_success "Service ${service_name} is running (${replicas})"
         return 0
     else

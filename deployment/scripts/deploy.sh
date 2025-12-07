@@ -197,6 +197,11 @@ fi
 
 print_info "Deploying stack '${STACK_NAME}'..."
 
+# Export environment variables from env file for stack deploy
+set -a
+source "$ENV_FILE"
+set +a
+
 # Deploy the stack with environment file
 docker stack deploy \
     -c "$COMPOSE_FILE" \

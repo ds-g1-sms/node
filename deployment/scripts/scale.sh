@@ -173,8 +173,15 @@ fi
 # Get Current State
 # ==============================================================================
 
-CURRENT_REPLICAS=$(docker service ls --filter "name=${SERVICE_NAME}" --format "{{.Replicas}}" | cut -d'/' -f1)
-print_info "Current replicas for ${NODE_NAME}: ${CURRENT_REPLICAS}"
+CURRENT_REPLICAS_RAW=$(docker service ls --filter "name=${SERVICE_NAME}" --format "{{.Replicas}}" 2>/dev/null)
+
+if [ -z "$CURRENT_REPLICAS_RAW" ]; then
+    print_error "Unable to get current replica count for ${SERVICE_NAME}"
+    exit 1
+fi
+
+CURRENT_REPLICAS=$(echo "$CURRENT_REPLICAS_RAW" | cut -d'/' -f1)
+print_info "Current replicas for ${NODE_NAME}: ${CURRENT_REPLICAS_RAW}"
 
 if [ "$CURRENT_REPLICAS" = "$REPLICAS" ]; then
     print_warning "Service is already at ${REPLICAS} replicas. No action needed."

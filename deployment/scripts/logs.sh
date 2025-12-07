@@ -196,9 +196,13 @@ else
             CMD=$(build_logs_command "$service")
             
             # Add service name prefix to output
+            # Extract node name from service name (handles both formats)
+            local node_name="${service##*_}"
+            [ -z "$node_name" ] && node_name="$service"
+            
             {
                 eval "$CMD" 2>&1 | while IFS= read -r line; do
-                    echo "[${service##*_}] $line"
+                    echo "[$node_name] $line"
                 done
             } &
             
