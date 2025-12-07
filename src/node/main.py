@@ -23,6 +23,8 @@ from .room_state import (
 from .websocket_server import WebSocketServer
 from .xmlrpc_server import XMLRPCServer
 from .peer_registry import PeerRegistry
+from .schemas.events import create_member_left_event
+from .utils.broadcast import broadcast_to_peers
 
 # Configure logging
 logging.basicConfig(
@@ -244,32 +246,26 @@ async def _handle_node_failure(
         room = room_manager.get_room(room_id)
         member_count = len(room.members) if room else 0
 
-        event_data = {
-            "room_id": room_id,
-            "username": username,
-            "reason": "Node unreachable",
-            "member_count": member_count,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+        event_data = create_member_left_event(
+            room_id=room_id,
+            username=username,
+            member_count=member_count,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            reason="Node unreachable",
+        )
 
         # Broadcast to local WebSocket clients
         broadcast_msg = {"type": "member_left", "data": event_data}
         ws_server.broadcast_to_room_sync(room_id, broadcast_msg)
 
-        # Broadcast to other peer nodes
-        peers = peer_registry.list_peers()
-        for peer_node_id, peer_addr in peers.items():
-            if peer_node_id == node_id:
-                continue  # Skip the failed node
-            try:
-                proxy = ServerProxy(peer_addr, allow_none=True)
-                proxy.receive_member_event_broadcast(
-                    room_id, "member_left", event_data
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to broadcast member_left to {peer_node_id}: {e}"
-                )
+        # Broadcast to other peer nodes (excluding the failed node)
+        broadcast_to_peers(
+            peer_registry,
+            room_id,
+            "member_left",
+            event_data,
+            exclude_node=node_id,
+        )
 
 
 async def stale_member_cleanup(
@@ -321,31 +317,22 @@ async def stale_member_cleanup(
                     room = room_manager.get_room(room_id)
                     member_count = len(room.members) if room else 0
 
-                    event_data = {
-                        "room_id": room_id,
-                        "username": username,
-                        "reason": "Inactivity",
-                        "member_count": member_count,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
+                    event_data = create_member_left_event(
+                        room_id=room_id,
+                        username=username,
+                        member_count=member_count,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        reason="Inactivity",
+                    )
 
                     # Broadcast to local WebSocket clients
                     broadcast_msg = {"type": "member_left", "data": event_data}
                     ws_server.broadcast_to_room_sync(room_id, broadcast_msg)
 
                     # Broadcast to peer nodes
-                    peers = peer_registry.list_peers()
-                    for peer_node_id, peer_addr in peers.items():
-                        try:
-                            proxy = ServerProxy(peer_addr, allow_none=True)
-                            proxy.receive_member_event_broadcast(
-                                room_id, "member_left", event_data
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to broadcast member_left to "
-                                f"{peer_node_id}: {e}"
-                            )
+                    broadcast_to_peers(
+                        peer_registry, room_id, "member_left", event_data
+                    )
 
                     logger.info(
                         f"Removed stale member {username} from room {room_id}"

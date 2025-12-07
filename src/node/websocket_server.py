@@ -16,6 +16,18 @@ from websockets.server import WebSocketServerProtocol
 
 from .room_state import RoomStateManager, RoomState
 from .peer_registry import PeerRegistry
+from .schemas.events import (
+    create_member_joined_event,
+    create_member_left_event,
+    create_room_deleted_event,
+)
+from .schemas.messages import (
+    create_message_sent_confirmation,
+    create_message_error,
+)
+from .schemas.responses import create_join_error_response, create_error_response
+from .utils.broadcast import broadcast_to_peers, broadcast_message_to_peers
+from .utils.validation import validate_message_content
 
 logger = logging.getLogger(__name__)
 
@@ -255,32 +267,20 @@ class WebSocketServer:
                 self.room_manager.remove_member(room_id, username)
 
                 # Broadcast member_left to remaining members
-                broadcast_msg = {
-                    "type": "member_left",
-                    "data": {
-                        "room_id": room_id,
-                        "username": username,
-                        "reason": "User disconnected",
-                        "member_count": len(room.members),
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                }
+                event_data = create_member_left_event(
+                    room_id=room_id,
+                    username=username,
+                    member_count=len(room.members),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    reason="User disconnected",
+                )
+                broadcast_msg = {"type": "member_left", "data": event_data}
                 await self.broadcast_to_room(room_id, broadcast_msg, websocket)
 
                 # Also broadcast to peer nodes
-                if self.peer_registry:
-                    peers = self.peer_registry.list_peers()
-                    for peer_node_id, peer_addr in peers.items():
-                        try:
-                            proxy = ServerProxy(peer_addr, allow_none=True)
-                            proxy.receive_member_event_broadcast(
-                                room_id, "member_left", broadcast_msg["data"]
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to broadcast member_left "
-                                f"to {peer_node_id}: {e}"
-                            )
+                broadcast_to_peers(
+                    self.peer_registry, room_id, "member_left", event_data
+                )
 
                 logger.info(
                     f"User {username} removed from local room {room_id} "
@@ -606,32 +606,20 @@ class WebSocketServer:
             )
 
             # Broadcast member_joined to existing members
-            broadcast_msg = {
-                "type": "member_joined",
-                "data": {
-                    "room_id": room_id,
-                    "username": username,
-                    "member_count": len(room.members),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                },
-            }
+            event_data = create_member_joined_event(
+                room_id=room_id,
+                username=username,
+                member_count=len(room.members),
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+            broadcast_msg = {"type": "member_joined", "data": event_data}
             await self.broadcast_to_room(room_id, broadcast_msg, websocket)
             logger.info(f"User {username} joined local room {room.room_name}")
 
             # Also broadcast to peer nodes
-            if self.peer_registry:
-                peers = self.peer_registry.list_peers()
-                for peer_node_id, peer_addr in peers.items():
-                    try:
-                        proxy = ServerProxy(peer_addr, allow_none=True)
-                        proxy.receive_member_event_broadcast(
-                            room_id, "member_joined", broadcast_msg["data"]
-                        )
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to broadcast member_joined "
-                            f"to {peer_node_id}: {e}"
-                        )
+            broadcast_to_peers(
+                self.peer_registry, room_id, "member_joined", event_data
+            )
         else:
             # User is already a member (e.g., room creator)
             # Just log it - we'll register their WebSocket connection below
@@ -741,14 +729,7 @@ class WebSocketServer:
             error: The error message
             error_code: The error code
         """
-        response = {
-            "type": "join_room_error",
-            "data": {
-                "room_id": room_id,
-                "error": error,
-                "error_code": error_code,
-            },
-        }
+        response = create_join_error_response(room_id, error, error_code)
         await websocket.send(json.dumps(response))
 
     async def handle_leave_room(
@@ -786,31 +767,19 @@ class WebSocketServer:
                 self.room_manager.remove_member(room_id, username)
 
                 # Broadcast member_left to remaining local members
-                broadcast_msg = {
-                    "type": "member_left",
-                    "data": {
-                        "room_id": room_id,
-                        "username": username,
-                        "member_count": len(room.members),
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                }
+                event_data = create_member_left_event(
+                    room_id=room_id,
+                    username=username,
+                    member_count=len(room.members),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                broadcast_msg = {"type": "member_left", "data": event_data}
                 await self.broadcast_to_room(room_id, broadcast_msg, websocket)
 
                 # Also broadcast to peer nodes
-                if self.peer_registry:
-                    peers = self.peer_registry.list_peers()
-                    for peer_node_id, peer_addr in peers.items():
-                        try:
-                            proxy = ServerProxy(peer_addr, allow_none=True)
-                            proxy.receive_member_event_broadcast(
-                                room_id, "member_left", broadcast_msg["data"]
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to broadcast member_left "
-                                f"to {peer_node_id}: {e}"
-                            )
+                broadcast_to_peers(
+                    self.peer_registry, room_id, "member_left", event_data
+                )
             else:
                 # Remote room - call XML-RPC on the admin node
                 await self._handle_remote_leave(room_id, username)
@@ -947,10 +916,7 @@ class WebSocketServer:
             error_message: The error message
             error_type: The type of error response
         """
-        response = {
-            "type": error_type,
-            "data": {"success": False, "message": error_message},
-        }
+        response = create_error_response(error_message, error_type)
         await websocket.send(json.dumps(response))
 
     async def handle_send_message(
@@ -981,20 +947,12 @@ class WebSocketServer:
                 return
 
             # Validate message content
-            if not content:
+            is_valid, error_msg = validate_message_content(content)
+            if not is_valid:
                 await self.send_message_error(
                     websocket,
                     room_id,
-                    "Message content cannot be empty",
-                    "INVALID_CONTENT",
-                )
-                return
-
-            if len(content) > 5000:
-                await self.send_message_error(
-                    websocket,
-                    room_id,
-                    "Message content too long (max 5000 characters)",
+                    error_msg,
                     "INVALID_CONTENT",
                 )
                 return
@@ -1030,15 +988,12 @@ class WebSocketServer:
 
             if result["success"]:
                 # Send confirmation to sender
-                confirmation = {
-                    "type": "message_sent",
-                    "data": {
-                        "room_id": room_id,
-                        "message_id": result["message_id"],
-                        "sequence_number": result["sequence_number"],
-                        "timestamp": result["timestamp"],
-                    },
-                }
+                confirmation = create_message_sent_confirmation(
+                    room_id=room_id,
+                    message_id=result["message_id"],
+                    sequence_number=result["sequence_number"],
+                    timestamp=result["timestamp"],
+                )
                 await websocket.send(json.dumps(confirmation))
                 logger.info(
                     f"Message from {username} sent successfully "
@@ -1211,16 +1166,7 @@ class WebSocketServer:
                     pass
 
         # Broadcast to remote nodes via XML-RPC
-        if self.peer_registry:
-            peers = self.peer_registry.list_peers()
-            for node_id, node_addr in peers.items():
-                try:
-                    proxy = ServerProxy(node_addr, allow_none=True)
-                    proxy.receive_message_broadcast(room_id, message)
-                except Exception as e:
-                    logger.error(
-                        f"Failed to broadcast message to {node_id}: {e}"
-                    )
+        broadcast_message_to_peers(self.peer_registry, room_id, message)
 
     def broadcast_message_to_room_sync(self, room_id: str, message: dict):
         """
@@ -1265,14 +1211,7 @@ class WebSocketServer:
             error: The error message
             error_code: The error code
         """
-        response = {
-            "type": "message_error",
-            "data": {
-                "room_id": room_id,
-                "error": error,
-                "error_code": error_code,
-            },
-        }
+        response = create_message_error(room_id, error, error_code)
         await websocket.send(json.dumps(response))
 
     # ===== Room Deletion with Two-Phase Commit (2PC) =====
@@ -1660,14 +1599,7 @@ class WebSocketServer:
 
     async def _notify_room_deleted(self, room_id: str, room_name: str):
         """Notify all local clients that a room was deleted."""
-        notification = {
-            "type": "room_deleted",
-            "data": {
-                "room_id": room_id,
-                "room_name": room_name,
-                "message": f"Room '{room_name}' has been deleted",
-            },
-        }
+        notification = create_room_deleted_event(room_id, room_name)
         # Broadcast to all clients in the room
         if room_id in self._room_clients:
             message_json = json.dumps(notification)
