@@ -250,7 +250,11 @@ if [ "$VERIFY_DEPLOYMENT" = true ]; then
         REPLICAS=$(docker service ls --filter "name=${service}" --format "{{.Replicas}}")
         print_info "Service ${service}: ${REPLICAS}"
         
-        if ! echo "$REPLICAS" | grep -q "^1/1"; then
+        # Parse replicas in format "running/desired"
+        RUNNING=$(echo "$REPLICAS" | cut -d'/' -f1)
+        DESIRED=$(echo "$REPLICAS" | cut -d'/' -f2)
+        
+        if [ "$RUNNING" != "$DESIRED" ] || [ "$RUNNING" -eq 0 ]; then
             print_warning "Service ${service} is not fully ready"
             ALL_HEALTHY=false
         fi

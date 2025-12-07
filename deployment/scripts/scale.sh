@@ -180,11 +180,21 @@ if [ -z "$CURRENT_REPLICAS_RAW" ]; then
     exit 1
 fi
 
+# Validate format is "running/desired"
+if ! echo "$CURRENT_REPLICAS_RAW" | grep -qE '^[0-9]+/[0-9]+$'; then
+    print_error "Unexpected replica format: ${CURRENT_REPLICAS_RAW}"
+    exit 1
+fi
+
 CURRENT_REPLICAS=$(echo "$CURRENT_REPLICAS_RAW" | cut -d'/' -f1)
+CURRENT_DESIRED=$(echo "$CURRENT_REPLICAS_RAW" | cut -d'/' -f2)
 print_info "Current replicas for ${NODE_NAME}: ${CURRENT_REPLICAS_RAW}"
 
-if [ "$CURRENT_REPLICAS" = "$REPLICAS" ]; then
-    print_warning "Service is already at ${REPLICAS} replicas. No action needed."
+if [ "$CURRENT_DESIRED" = "$REPLICAS" ]; then
+    print_warning "Service is already configured for ${REPLICAS} replicas."
+    if [ "$CURRENT_REPLICAS" != "$CURRENT_DESIRED" ]; then
+        print_info "Service is converging to desired state..."
+    fi
     exit 0
 fi
 

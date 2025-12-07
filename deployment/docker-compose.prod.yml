@@ -1,5 +1,9 @@
 # Production Docker Compose Configuration for Distributed Chat System
 # This configuration is designed for multi-host deployment using Docker Swarm
+#
+# Note: Health check configuration is repeated for each service as Docker Compose
+# version 3.8 doesn't support YAML anchors/aliases for healthcheck sections.
+# This is by design to maintain compatibility with Docker Swarm.
 
 version: '3.8'
 
