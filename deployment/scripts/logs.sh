@@ -134,24 +134,27 @@ if ! docker stack ls 2>/dev/null | grep -q "$STACK_NAME"; then
 fi
 
 # ==============================================================================
-# Build Docker Service Logs Command
+# Execute Docker Service Logs Command (Safely)
 # ==============================================================================
 
-build_logs_command() {
+execute_logs_command() {
     local service_name=$1
-    local cmd="docker service logs"
+    local args=()
+    
+    args+=("service" "logs")
     
     if [ "$FOLLOW" = true ]; then
-        cmd="$cmd -f"
+        args+=("-f")
     fi
     
     if [ "$SHOW_ALL" = false ]; then
-        cmd="$cmd --tail ${TAIL_LINES}"
+        args+=("--tail" "$TAIL_LINES")
     fi
     
-    cmd="$cmd --timestamps ${service_name}"
+    args+=("--timestamps" "$service_name")
     
-    echo "$cmd"
+    # Execute docker command with arguments array (safe from injection)
+    docker "${args[@]}"
 }
 
 # ==============================================================================
@@ -172,9 +175,8 @@ if [ -n "$NODE_NAME" ]; then
     
     print_info "Viewing logs for ${NODE_NAME} (service: ${SERVICE_NAME})"
     
-    # Build and execute command
-    CMD=$(build_logs_command "$SERVICE_NAME")
-    eval "$CMD"
+    # Execute command safely
+    execute_logs_command "$SERVICE_NAME"
 else
     # View logs for all nodes
     print_info "Viewing logs for all nodes in stack ${STACK_NAME}"
@@ -193,15 +195,12 @@ else
         
         PIDS=()
         for service in $SERVICES; do
-            CMD=$(build_logs_command "$service")
-            
-            # Add service name prefix to output
             # Extract node name from service name (handles both formats)
-            local node_name="${service##*_}"
+            node_name="${service##*_}"
             [ -z "$node_name" ] && node_name="$service"
             
             {
-                eval "$CMD" 2>&1 | while IFS= read -r line; do
+                execute_logs_command "$service" 2>&1 | while IFS= read -r line; do
                     echo "[$node_name] $line"
                 done
             } &
@@ -220,8 +219,7 @@ else
             print_info "=== Logs from ${service##*_} (${service}) ==="
             echo ""
             
-            CMD=$(build_logs_command "$service")
-            eval "$CMD"
+            execute_logs_command "$service"
         done
     fi
 fi

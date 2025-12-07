@@ -1,5 +1,8 @@
 # Development Docker Compose Configuration for Single Machine Testing
 # This configuration overrides production settings for local development
+#
+# Note: The 'deploy' section is supported in Compose v2 for resource limits
+# even in non-swarm mode. Use 'docker compose' (v2) not 'docker-compose' (v1).
 
 version: '3.8'
 
