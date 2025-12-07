@@ -4,6 +4,13 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Create non-root user for running the application
+RUN groupadd -r chatnode && useradd -r -g chatnode chatnode
+
+# Create directories for logs and data with proper permissions
+RUN mkdir -p /var/log/chatnode /var/lib/chatnode && \
+    chown -R chatnode:chatnode /var/log/chatnode /var/lib/chatnode
+
 # Copy requirements file (generated from Poetry for Docker builds)
 COPY requirements.txt .
 
@@ -14,8 +21,18 @@ RUN pip install --no-cache-dir -r requirements.txt || \
 # Copy source code
 COPY src/ ./src/
 
+# Change ownership of application files
+RUN chown -R chatnode:chatnode /app
+
+# Switch to non-root user
+USER chatnode
+
 # Expose ports (XML-RPC and WebSocket)
 EXPOSE 8080 9090
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import xmlrpc.client; xmlrpc.client.ServerProxy('http://localhost:9090').heartbeat()" || exit 1
 
 # Run the node server
 CMD ["python", "-m", "src.node.main"]

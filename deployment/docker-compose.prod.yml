@@ -1,0 +1,272 @@
+# Production Docker Compose Configuration for Distributed Chat System
+# This configuration is designed for multi-host deployment using Docker Swarm
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Node 1 - First Chat Node
+  # ============================================================================
+  node1:
+    image: ${REGISTRY:-ghcr.io/ds-g1-sms}/chat-node:${VERSION:-latest}
+    hostname: node1
+    networks:
+      - chat-overlay
+    ports:
+      - target: 8080
+        published: ${NODE1_WS_PORT:-8081}
+        protocol: tcp
+        mode: host
+      - target: 9090
+        published: ${NODE1_XMLRPC_PORT:-9091}
+        protocol: tcp
+        mode: host
+    environment:
+      - NODE_ID=node1
+      - XMLRPC_PORT=9090
+      - WEBSOCKET_PORT=8080
+      - XMLRPC_HOST=0.0.0.0
+      - WEBSOCKET_HOST=0.0.0.0
+      - XMLRPC_ADDRESS=http://node1:9090
+      - PEER_NODES=node2:http://node2:9090,node3:http://node3:9090
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - node1-logs:/var/log/chatnode
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.node_type == node1
+        preferences:
+          - spread: node.labels.zone
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        order: stop-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+    healthcheck:
+      test: ["CMD", "python", "-c", "import xmlrpc.client; xmlrpc.client.ServerProxy('http://localhost:9090').heartbeat()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================================
+  # Node 2 - Second Chat Node
+  # ============================================================================
+  node2:
+    image: ${REGISTRY:-ghcr.io/ds-g1-sms}/chat-node:${VERSION:-latest}
+    hostname: node2
+    networks:
+      - chat-overlay
+    ports:
+      - target: 8080
+        published: ${NODE2_WS_PORT:-8082}
+        protocol: tcp
+        mode: host
+      - target: 9090
+        published: ${NODE2_XMLRPC_PORT:-9092}
+        protocol: tcp
+        mode: host
+    environment:
+      - NODE_ID=node2
+      - XMLRPC_PORT=9090
+      - WEBSOCKET_PORT=8080
+      - XMLRPC_HOST=0.0.0.0
+      - WEBSOCKET_HOST=0.0.0.0
+      - XMLRPC_ADDRESS=http://node2:9090
+      - PEER_NODES=node1:http://node1:9090,node3:http://node3:9090
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - node2-logs:/var/log/chatnode
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.node_type == node2
+        preferences:
+          - spread: node.labels.zone
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        order: stop-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+    healthcheck:
+      test: ["CMD", "python", "-c", "import xmlrpc.client; xmlrpc.client.ServerProxy('http://localhost:9090').heartbeat()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================================
+  # Node 3 - Third Chat Node
+  # ============================================================================
+  node3:
+    image: ${REGISTRY:-ghcr.io/ds-g1-sms}/chat-node:${VERSION:-latest}
+    hostname: node3
+    networks:
+      - chat-overlay
+    ports:
+      - target: 8080
+        published: ${NODE3_WS_PORT:-8083}
+        protocol: tcp
+        mode: host
+      - target: 9090
+        published: ${NODE3_XMLRPC_PORT:-9093}
+        protocol: tcp
+        mode: host
+    environment:
+      - NODE_ID=node3
+      - XMLRPC_PORT=9090
+      - WEBSOCKET_PORT=8080
+      - XMLRPC_HOST=0.0.0.0
+      - WEBSOCKET_HOST=0.0.0.0
+      - XMLRPC_ADDRESS=http://node3:9090
+      - PEER_NODES=node1:http://node1:9090,node2:http://node2:9090
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - node3-logs:/var/log/chatnode
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.node_type == node3
+        preferences:
+          - spread: node.labels.zone
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        order: stop-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+    healthcheck:
+      test: ["CMD", "python", "-c", "import xmlrpc.client; xmlrpc.client.ServerProxy('http://localhost:9090').heartbeat()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# ==============================================================================
+# Networks
+# ==============================================================================
+networks:
+  chat-overlay:
+    driver: overlay
+    attachable: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.0.0/16
+
+# ==============================================================================
+# Volumes
+# ==============================================================================
+volumes:
+  node1-logs:
+    driver: local
+  node2-logs:
+    driver: local
+  node3-logs:
+    driver: local
+
+# ==============================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ==============================================================================
+# 
+# Prerequisites:
+# 1. Three machines with Docker Engine installed
+# 2. Docker Swarm initialized across the machines
+# 3. Each machine labeled with node_type (node1, node2, node3)
+# 4. Docker images built and pushed to registry
+#
+# Setup Docker Swarm:
+#   On manager node:
+#     docker swarm init --advertise-addr <MANAGER-IP>
+#   
+#   On worker nodes:
+#     docker swarm join --token <WORKER-TOKEN> <MANAGER-IP>:2377
+#
+# Label nodes:
+#   docker node update --label-add node_type=node1 <NODE1-HOSTNAME>
+#   docker node update --label-add node_type=node2 <NODE2-HOSTNAME>
+#   docker node update --label-add node_type=node3 <NODE3-HOSTNAME>
+#
+# Build and push images:
+#   docker build -f Dockerfile.node -t ${REGISTRY}/chat-node:${VERSION} .
+#   docker push ${REGISTRY}/chat-node:${VERSION}
+#
+# Deploy stack:
+#   docker stack deploy -c deployment/docker-compose.prod.yml chat-system
+#
+# Check services:
+#   docker stack services chat-system
+#   docker service ls
+#
+# View logs:
+#   docker service logs -f chat-system_node1
+#   docker service logs -f chat-system_node2
+#   docker service logs -f chat-system_node3
+#
+# Scale a service (add more replicas):
+#   docker service scale chat-system_node1=2
+#
+# Update service (rolling update):
+#   docker service update --image ${REGISTRY}/chat-node:v2 chat-system_node1
+#
+# Remove stack:
+#   docker stack rm chat-system
+#
+# ==============================================================================
