@@ -357,10 +357,13 @@ def generate_html_report(suite_results, output_file):
         
         clients = config['clients']
         messages = config['messages_per_client']
-        throughput = results.get('summary', {}).get('throughput', 0)
-        avg_latency = results.get('latency', {}).get('average', 0) * 1000
-        p95_latency = results.get('latency', {}).get('p95', 0) * 1000
-        success_rate = results.get('summary', {}).get('success_rate', 0)
+        summary = results.get('summary', {})
+        latency = results.get('latency_stats', {})
+        
+        throughput = summary.get('overall_throughput_msg_per_sec', 0)
+        avg_latency = latency.get('avg_latency_ms', 0)
+        p95_latency = latency.get('p95_latency_ms', 0)
+        success_rate = summary.get('success_rate', 0) * 100
         
         success_class = "good" if success_rate >= 99 else ("warn" if success_rate >= 95 else "bad")
         
@@ -390,7 +393,7 @@ def generate_html_report(suite_results, output_file):
         config = scenario['config']
         results = scenario['results']
         summary = results.get('summary', {})
-        latency = results.get('latency', {})
+        latency = results.get('latency_stats', {})
         
         html += f"""
         <div class="scenario">
@@ -402,23 +405,23 @@ def generate_html_report(suite_results, output_file):
             
             <h4>Summary</h4>
             <table>
-                <tr><td>Total Duration</td><td class="metric">{summary.get('total_duration', 0):.2f}s</td></tr>
-                <tr><td>Messages Sent</td><td class="metric">{summary.get('messages_sent', 0):,}</td></tr>
-                <tr><td>Messages Received</td><td class="metric">{summary.get('messages_received', 0):,}</td></tr>
-                <tr><td>Errors</td><td class="metric">{summary.get('errors', 0)}</td></tr>
-                <tr><td>Success Rate</td><td class="metric">{summary.get('success_rate', 0):.2f}%</td></tr>
-                <tr><td>Throughput</td><td class="metric">{summary.get('throughput', 0):.2f} msg/s</td></tr>
+                <tr><td>Total Duration</td><td class="metric">{summary.get('total_duration_seconds', 0):.2f}s</td></tr>
+                <tr><td>Messages Sent</td><td class="metric">{summary.get('total_messages_sent', 0):,}</td></tr>
+                <tr><td>Messages Received</td><td class="metric">{summary.get('total_messages_received', 0):,}</td></tr>
+                <tr><td>Errors</td><td class="metric">{summary.get('total_errors', 0)}</td></tr>
+                <tr><td>Success Rate</td><td class="metric">{summary.get('success_rate', 0) * 100:.2f}%</td></tr>
+                <tr><td>Throughput</td><td class="metric">{summary.get('overall_throughput_msg_per_sec', 0):.2f} msg/s</td></tr>
             </table>
             
             <h4>Latency Statistics</h4>
             <table>
-                <tr><td>Average</td><td class="metric">{latency.get('average', 0) * 1000:.2f} ms</td></tr>
-                <tr><td>Median</td><td class="metric">{latency.get('median', 0) * 1000:.2f} ms</td></tr>
-                <tr><td>Min</td><td class="metric">{latency.get('min', 0) * 1000:.2f} ms</td></tr>
-                <tr><td>Max</td><td class="metric">{latency.get('max', 0) * 1000:.2f} ms</td></tr>
-                <tr><td>95th Percentile</td><td class="metric">{latency.get('p95', 0) * 1000:.2f} ms</td></tr>
-                <tr><td>99th Percentile</td><td class="metric">{latency.get('p99', 0) * 1000:.2f} ms</td></tr>
-                <tr><td>Std Deviation</td><td class="metric">{latency.get('stddev', 0) * 1000:.2f} ms</td></tr>
+                <tr><td>Average</td><td class="metric">{latency.get('avg_latency_ms', 0):.2f} ms</td></tr>
+                <tr><td>Median</td><td class="metric">{latency.get('median_latency_ms', 0):.2f} ms</td></tr>
+                <tr><td>Min</td><td class="metric">{latency.get('min_latency_ms', 0):.2f} ms</td></tr>
+                <tr><td>Max</td><td class="metric">{latency.get('max_latency_ms', 0):.2f} ms</td></tr>
+                <tr><td>95th Percentile</td><td class="metric">{latency.get('p95_latency_ms', 0):.2f} ms</td></tr>
+                <tr><td>99th Percentile</td><td class="metric">{latency.get('p99_latency_ms', 0):.2f} ms</td></tr>
+                <tr><td>Std Deviation</td><td class="metric">{latency.get('stdev_latency_ms', 0):.2f} ms</td></tr>
             </table>
         </div>
 """
