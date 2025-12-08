@@ -131,11 +131,9 @@ services:
       - target: 8080
         published: 8081
         protocol: tcp
-        mode: host
       - target: 9090
         published: 9091
         protocol: tcp
-        mode: host
     environment:
       - NODE_ID=node1
       - XMLRPC_PORT=9090
@@ -180,11 +178,9 @@ services:
       - target: 8080
         published: 8082
         protocol: tcp
-        mode: host
       - target: 9090
         published: 9092
         protocol: tcp
-        mode: host
     environment:
       - NODE_ID=node2
       - XMLRPC_PORT=9090
@@ -229,11 +225,9 @@ services:
       - target: 8080
         published: 8083
         protocol: tcp
-        mode: host
       - target: 9090
         published: 9093
         protocol: tcp
-        mode: host
     environment:
       - NODE_ID=node3
       - XMLRPC_PORT=9090
@@ -298,20 +292,36 @@ print_info "Checking deployment status..."
 vagrant ssh node1 -c "docker stack services chat-demo"
 
 echo ""
+print_info "Waiting for services to be ready (this may take 30-60 seconds)..."
+sleep 20
+
+# Check if services are running
+print_info "Verifying service deployment..."
+vagrant ssh node1 -c "docker stack ps chat-demo"
+
+echo ""
 echo "=========================================="
 print_success "Demo deployment complete!"
 echo "=========================================="
 echo ""
-echo "Access points:"
-echo "  Node 1: http://192.168.56.101:8081 (WebSocket)"
-echo "  Node 2: http://192.168.56.102:8082 (WebSocket)"
-echo "  Node 3: http://192.168.56.103:8083 (WebSocket)"
+echo "IMPORTANT: With Docker Swarm's ingress networking, you can access"
+echo "all services from ANY node's IP address:"
+echo ""
+echo "Access points (any of these IPs work for any service):"
+echo "  - http://192.168.56.101:8081 (or :8082 or :8083)"
+echo "  - http://192.168.56.102:8081 (or :8082 or :8083)"
+echo "  - http://192.168.56.103:8081 (or :8082 or :8083)"
+echo ""
+echo "Recommended: Connect to http://192.168.56.101:8081"
 echo ""
 echo "To check logs:"
 echo "  vagrant ssh node1 -c 'docker service logs -f chat-demo_node1'"
 echo ""
 echo "To check health:"
 echo "  vagrant ssh node1 -c 'docker stack ps chat-demo'"
+echo ""
+echo "To test connectivity:"
+echo "  curl -v http://192.168.56.101:8081"
 echo ""
 echo "To remove deployment:"
 echo "  vagrant ssh node1 -c 'docker stack rm chat-demo'"

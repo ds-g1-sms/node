@@ -29,10 +29,12 @@ This builds the image and deploys to the Swarm cluster.
 
 ### 3. Connect!
 
-Access points are ready at:
-- http://192.168.56.101:8081
-- http://192.168.56.102:8082
-- http://192.168.56.103:8083
+⏱️ **Wait 30-60 seconds** for services to fully start after deployment.
+
+Access points (thanks to Swarm's routing mesh, use ANY IP):
+- http://192.168.56.101:8081 ✅ Recommended
+- http://192.168.56.102:8081
+- http://192.168.56.103:8081
 
 From project root, run the client:
 
@@ -40,7 +42,7 @@ From project root, run the client:
 poetry run chat-client
 ```
 
-Connect to `192.168.56.101:8081` (or any of the IPs above).
+Connect to `192.168.56.101:8081`.
 
 ## Verify It's Working
 
@@ -78,18 +80,24 @@ vagrant destroy -f
 
 ## Troubleshooting
 
+**Connection refused on port 8081?**
+- Wait 30-60 seconds after deployment for services to start
+- Run: `./scripts/troubleshoot-connectivity.sh` for detailed diagnostics
+- Check logs: `vagrant ssh node1 -c "docker service logs chat-demo_node1"`
+
 **VMs won't start?**
 - Check VirtualBox is installed: `VBoxManage --version`
 - Ensure you have 8GB RAM available
 
 **Services not deploying?**
 - Check Swarm: `vagrant ssh node1 -c "docker node ls"`
-- Check logs: `vagrant ssh node1 -c "docker service logs chat-demo_node1"`
+- Check tasks: `vagrant ssh node1 -c "docker stack ps chat-demo"`
 
-**Can't connect?**
-- Verify VMs are running: `vagrant status`
-- Check services: `vagrant ssh node1 -c "docker stack services chat-demo"`
-- Ensure using correct IP:port in client
+**Still having issues?**
+Run the troubleshooting script:
+```bash
+./scripts/troubleshoot-connectivity.sh
+```
 
 ## Help
 

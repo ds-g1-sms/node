@@ -297,10 +297,54 @@ vagrant ssh node1 -c "sudo iptables -L"
 
 ### Can't connect from chat client
 
-1. Ensure VMs are running: `vagrant status`
-2. Check services are deployed: `vagrant ssh node1 -c "docker stack ps chat-demo"`
-3. Verify ports are accessible: `curl http://192.168.56.101:8081` (should get connection refused or response)
-4. Check your client is using the correct IP and port
+**Common Issue**: Connection refused on port 8081/8082/8083
+
+This usually happens if services are still starting up. Docker Swarm services can take 30-60 seconds to fully initialize.
+
+**Solutions**:
+
+1. **Wait for services to be ready**:
+   ```bash
+   vagrant ssh node1 -c "docker stack ps chat-demo"
+   ```
+   All services should show "Running" state.
+
+2. **Check service logs**:
+   ```bash
+   vagrant ssh node1 -c "docker service logs chat-demo_node1"
+   ```
+   Look for "WebSocket server started" or similar messages.
+
+3. **Test from inside a VM**:
+   ```bash
+   vagrant ssh node1 -c "curl -v http://localhost:8081"
+   ```
+   If this works but external access doesn't, it's a networking issue.
+
+4. **Verify Swarm ingress networking**:
+   ```bash
+   vagrant ssh node1 -c "docker network inspect ingress"
+   ```
+   Should show all nodes in the swarm.
+
+5. **Check if containers are running**:
+   ```bash
+   vagrant ssh node1 -c "docker ps"
+   vagrant ssh node2 -c "docker ps"
+   vagrant ssh node3 -c "docker ps"
+   ```
+
+6. **Verify port publishing**:
+   ```bash
+   vagrant ssh node1 -c "docker service inspect chat-demo_node1 --format '{{json .Endpoint.Ports}}'"
+   ```
+
+7. **Try accessing from any Swarm node** (Swarm ingress routing):
+   - http://192.168.56.101:8081 (from manager)
+   - http://192.168.56.102:8081 (from worker 1)
+   - http://192.168.56.103:8081 (from worker 2)
+   
+   All should work due to Swarm's routing mesh!
 
 ## Customization
 
