@@ -88,9 +88,37 @@ echo "$TASK_STATUS"
 # Check for failed tasks
 if echo "$TASK_STATUS" | grep -qi "failed\|rejected"; then
     print_error "Some tasks have failed!"
+    
+    # Check if it's an image issue
+    if echo "$TASK_STATUS" | grep -qi "No such image"; then
+        print_error "Image not found on nodes! This usually means the image wasn't properly distributed."
+        echo ""
+        print_info "Checking which nodes have the image..."
+        for node in node1 node2 node3; do
+            if vagrant ssh $node -c "docker images | grep chat-node:demo" &>/dev/null; then
+                print_success "Image found on $node"
+            else
+                print_error "Image NOT found on $node"
+            fi
+        done
+        echo ""
+        echo "To fix this issue:"
+        echo "1. Remove the failed stack: vagrant ssh node1 -c 'docker stack rm chat-demo'"
+        echo "2. Wait 10 seconds for cleanup"
+        echo "3. Re-run deployment: ./scripts/deploy-demo.sh"
+        echo ""
+    fi
 else
     print_success "All tasks are scheduled"
 fi
+echo ""
+
+# Check images on each node
+print_info "Checking Docker images on each node..."
+for node in node1 node2 node3; do
+    echo "--- $node ---"
+    vagrant ssh $node -c "docker images | grep -E 'REPOSITORY|chat-node'" 2>&1 || echo "No chat-node images found"
+done
 echo ""
 
 # Check containers are running on each node

@@ -268,6 +268,35 @@ vagrant ssh node1 -c "docker swarm init --advertise-addr 192.168.56.101"
 
 ### Services not starting
 
+**Error: "No such image: chat-node:demo"**
+
+This means the Docker image wasn't properly distributed to all nodes in the Swarm.
+
+**Solution:**
+
+1. Remove the failed stack:
+   ```bash
+   vagrant ssh node1 -c "docker stack rm chat-demo"
+   sleep 10
+   ```
+
+2. Verify images are missing:
+   ```bash
+   for node in node1 node2 node3; do
+     echo "=== $node ==="
+     vagrant ssh $node -c "docker images | grep chat-node"
+   done
+   ```
+
+3. Re-run the deployment script (it will rebuild and distribute the image):
+   ```bash
+   ./scripts/deploy-demo.sh
+   ```
+
+**Prevention:** The deployment script now automatically verifies images on all nodes before deployment.
+
+**Other service issues:**
+
 ```bash
 # Check service logs
 vagrant ssh node1 -c "docker service logs chat-demo_node1"
@@ -275,11 +304,8 @@ vagrant ssh node1 -c "docker service logs chat-demo_node1"
 # Check node availability
 vagrant ssh node1 -c "docker node ls"
 
-# Check if images are present
-for node in node1 node2 node3; do
-  echo "=== $node ==="
-  vagrant ssh $node -c "docker images | grep chat-node"
-done
+# Check service status
+vagrant ssh node1 -c "docker stack ps chat-demo --no-trunc"
 ```
 
 ### Network connectivity issues

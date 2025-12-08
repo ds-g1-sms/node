@@ -73,21 +73,59 @@ if docker info &>/dev/null; then
     print_info "Building image locally..."
     docker build -f Dockerfile.node -t chat-node:demo .
     
-    # Save image to file
+    # Save image to file in demo directory (accessible to VMs via /vagrant)
     print_info "Saving image to transfer to VMs..."
-    docker save chat-node:demo -o /tmp/chat-node-demo.tar
+    docker save chat-node:demo -o "$DEMO_DIR/chat-node-demo.tar"
     
     # Load image on all VMs
     for node in node1 node2 node3; do
         print_info "Loading image on $node..."
-        vagrant ssh $node -c "docker load -i /tmp/chat-node-demo.tar" || true
+        if vagrant ssh $node -c "docker load -i /vagrant/chat-node-demo.tar"; then
+            print_success "Image loaded on $node"
+        else
+            print_error "Failed to load image on $node"
+            exit 1
+        fi
     done
     
-    rm -f /tmp/chat-node-demo.tar
-    print_success "Image loaded on all nodes"
+    # Verify image is present on all nodes
+    print_info "Verifying images on all nodes..."
+    for node in node1 node2 node3; do
+        if vagrant ssh $node -c "docker images | grep chat-node:demo" &>/dev/null; then
+            print_success "Image verified on $node"
+        else
+            print_error "Image not found on $node"
+            exit 1
+        fi
+    done
+    
+    # Clean up tar file
+    rm -f "$DEMO_DIR/chat-node-demo.tar"
+    print_success "Image loaded and verified on all nodes"
 else
-    print_warning "Docker not available on host. Image must be built on VMs."
-    vagrant ssh node1 -c "cd /vagrant && docker build -f Dockerfile.node -t chat-node:demo ."
+    print_warning "Docker not available on host. Building image on VMs..."
+    
+    # Build on manager node
+    print_info "Building image on node1..."
+    vagrant ssh node1 -c "cd /vagrant && docker build -f ../Dockerfile.node -t chat-node:demo .."
+    
+    # Save and transfer to other nodes
+    print_info "Transferring image to worker nodes..."
+    vagrant ssh node1 -c "docker save chat-node:demo -o /vagrant/chat-node-demo.tar"
+    
+    for node in node2 node3; do
+        print_info "Loading image on $node..."
+        if vagrant ssh $node -c "docker load -i /vagrant/chat-node-demo.tar"; then
+            print_success "Image loaded on $node"
+        else
+            print_error "Failed to load image on $node"
+            exit 1
+        fi
+    done
+    
+    # Clean up
+    vagrant ssh node1 -c "rm -f /vagrant/chat-node-demo.tar"
+    print_success "Image built and distributed to all nodes"
 fi
 
 echo ""

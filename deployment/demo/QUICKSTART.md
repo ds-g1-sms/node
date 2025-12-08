@@ -93,6 +93,12 @@ vagrant destroy -f
 - Check Swarm: `vagrant ssh node1 -c "docker node ls"`
 - Check tasks: `vagrant ssh node1 -c "docker stack ps chat-demo"`
 
+**Error: "No such image: chat-node:demo"?**
+This means images weren't distributed to all nodes.
+1. Remove stack: `vagrant ssh node1 -c "docker stack rm chat-demo"`
+2. Wait 10 seconds
+3. Re-run: `./scripts/deploy-demo.sh` (it will fix the distribution)
+
 **Still having issues?**
 Run the troubleshooting script:
 ```bash
