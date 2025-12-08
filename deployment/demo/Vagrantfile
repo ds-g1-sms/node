@@ -1,0 +1,177 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile for Distributed Chat System Demo
+# Creates 3 VMs to demonstrate multi-host Docker Swarm deployment
+
+Vagrant.configure("2") do |config|
+  # Base box - Ubuntu 22.04 LTS
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_version = "20231215.0.0"
+
+  # Disable automatic box update checking
+  config.vm.box_check_update = false
+
+  # Common VM settings
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"
+    vb.cpus = 2
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+  end
+
+  # Define the three nodes
+  nodes = [
+    { name: "node1", ip: "192.168.56.101", hostname: "chat-node1" },
+    { name: "node2", ip: "192.168.56.102", hostname: "chat-node2" },
+    { name: "node3", ip: "192.168.56.103", hostname: "chat-node3" }
+  ]
+
+  nodes.each_with_index do |node, index|
+    config.vm.define node[:name] do |nodeconfig|
+      # Network configuration
+      nodeconfig.vm.hostname = node[:hostname]
+      nodeconfig.vm.network "private_network", ip: node[:ip]
+
+      # Provider-specific configuration
+      nodeconfig.vm.provider "virtualbox" do |vb|
+        vb.name = node[:hostname]
+      end
+
+      # Provision Docker and dependencies on all nodes
+      nodeconfig.vm.provision "shell", inline: <<-SHELL
+        # Update package index
+        apt-get update
+
+        # Install prerequisites
+        apt-get install -y \
+          apt-transport-https \
+          ca-certificates \
+          curl \
+          gnupg \
+          lsb-release \
+          software-properties-common
+
+        # Add Docker's official GPG key
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+          gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
+
+        # Set up Docker repository
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+          https://download.docker.com/linux/ubuntu \
+          $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+          tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+        # Install Docker Engine
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+        # Add vagrant user to docker group
+        usermod -aG docker vagrant
+
+        # Enable and start Docker
+        systemctl enable docker
+        systemctl start docker
+
+        # Configure Docker daemon for Swarm
+        cat > /etc/docker/daemon.json <<EOF
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "dns": ["8.8.8.8", "8.8.4.4"]
+}
+EOF
+        systemctl restart docker
+
+        # Add host entries for all nodes
+        cat >> /etc/hosts <<EOF
+192.168.56.101 chat-node1 node1
+192.168.56.102 chat-node2 node2
+192.168.56.103 chat-node3 node3
+EOF
+
+        echo "Docker installed successfully on #{node[:hostname]}"
+      SHELL
+
+      # Initialize Swarm on the first node (manager)
+      if index == 0
+        nodeconfig.vm.provision "shell", inline: <<-SHELL
+          # Initialize Docker Swarm
+          docker swarm init --advertise-addr #{node[:ip]} 2>/dev/null || true
+
+          # Get worker join token and save it
+          docker swarm join-token worker -q > /vagrant/swarm-token.txt
+          echo "#{node[:ip]}" > /vagrant/swarm-manager-ip.txt
+
+          echo "Docker Swarm initialized on manager node"
+          docker node ls
+        SHELL
+      end
+
+      # Join worker nodes to the Swarm
+      if index > 0
+        nodeconfig.vm.provision "shell", inline: <<-SHELL
+          # Wait for manager to initialize and token file to be created
+          while [ ! -f /vagrant/swarm-token.txt ]; do
+            echo "Waiting for Swarm token..."
+            sleep 2
+          done
+
+          # Read manager IP and token
+          MANAGER_IP=$(cat /vagrant/swarm-manager-ip.txt)
+          WORKER_TOKEN=$(cat /vagrant/swarm-token.txt)
+
+          # Join the swarm as a worker
+          docker swarm join --token $WORKER_TOKEN ${MANAGER_IP}:2377 2>/dev/null || \
+            echo "Already joined to swarm"
+
+          echo "Joined Swarm on worker node #{node[:hostname]}"
+        SHELL
+      end
+
+      # Label nodes after all have joined (only on manager)
+      if index == nodes.length - 1
+        nodeconfig.vm.provision "shell", inline: <<-SHELL
+          # SSH to manager node to label all nodes
+          if [ "#{node[:name]}" != "node1" ]; then
+            # Wait a bit for all nodes to join
+            sleep 5
+          fi
+        SHELL
+        
+        # Add final provisioning on manager (via node1)
+        config.vm.define "node1" do |node1config|
+          node1config.vm.provision "shell", run: "never", inline: <<-SHELL
+            echo "Labeling nodes for deployment..."
+            
+            # Label each node for placement constraints
+            docker node update --label-add node_type=node1 chat-node1
+            docker node update --label-add node_type=node2 chat-node2
+            docker node update --label-add node_type=node3 chat-node3
+
+            echo "Node labels applied:"
+            docker node inspect chat-node1 --format '{{.Spec.Labels}}'
+            docker node inspect chat-node2 --format '{{.Spec.Labels}}'
+            docker node inspect chat-node3 --format '{{.Spec.Labels}}'
+            
+            echo ""
+            echo "Swarm cluster ready:"
+            docker node ls
+          SHELL
+        end
+      end
+    end
+  end
+
+  # Cleanup provisioner to run when destroying VMs
+  config.trigger.before :destroy do |trigger|
+    trigger.info = "Cleaning up Swarm tokens..."
+    trigger.run = {inline: "rm -f swarm-token.txt swarm-manager-ip.txt"}
+  end
+end

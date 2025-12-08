@@ -1,0 +1,117 @@
+# Development Docker Compose Configuration for Single Machine Testing
+# This configuration overrides production settings for local development
+#
+# Note: The 'deploy' section is supported in Compose v2 for resource limits
+# even in non-swarm mode. Use 'docker compose' (v2) not 'docker-compose' (v1).
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Node 1 - Development Override
+  # ============================================================================
+  node1:
+    build:
+      context: ..
+      dockerfile: Dockerfile.node
+    container_name: chat-node1-dev
+    ports:
+      - "8081:8080"  # WebSocket
+      - "9091:9090"  # XML-RPC
+    deploy:
+      # Remove swarm-specific deployment constraints for single machine
+      placement:
+        constraints: []
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - chat-network
+
+  # ============================================================================
+  # Node 2 - Development Override
+  # ============================================================================
+  node2:
+    build:
+      context: ..
+      dockerfile: Dockerfile.node
+    container_name: chat-node2-dev
+    ports:
+      - "8082:8080"  # WebSocket
+      - "9092:9090"  # XML-RPC
+    deploy:
+      # Remove swarm-specific deployment constraints for single machine
+      placement:
+        constraints: []
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - chat-network
+
+  # ============================================================================
+  # Node 3 - Development Override
+  # ============================================================================
+  node3:
+    build:
+      context: ..
+      dockerfile: Dockerfile.node
+    container_name: chat-node3-dev
+    ports:
+      - "8083:8080"  # WebSocket
+      - "9093:9090"  # XML-RPC
+    deploy:
+      # Remove swarm-specific deployment constraints for single machine
+      placement:
+        constraints: []
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - chat-network
+
+# ==============================================================================
+# Networks - Bridge for single machine
+# ==============================================================================
+networks:
+  chat-network:
+    driver: bridge
+
+# ==============================================================================
+# DEVELOPMENT USAGE
+# ==============================================================================
+# 
+# This file is designed to be used together with docker-compose.prod.yml
+# to run all nodes on a single machine for development and testing.
+#
+# Usage:
+#   # Start all services in development mode
+#   docker compose -f deployment/docker-compose.prod.yml -f deployment/docker-compose.dev.yml up -d
+#
+#   # View logs
+#   docker compose -f deployment/docker-compose.prod.yml -f deployment/docker-compose.dev.yml logs -f
+#
+#   # Stop all services
+#   docker compose -f deployment/docker-compose.prod.yml -f deployment/docker-compose.dev.yml down
+#
+#   # Rebuild images
+#   docker compose -f deployment/docker-compose.prod.yml -f deployment/docker-compose.dev.yml build
+#
+# Connecting to nodes:
+#   - Node 1: localhost:8081
+#   - Node 2: localhost:8082
+#   - Node 3: localhost:8083
+#
+# ==============================================================================

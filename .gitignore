@@ -49,9 +49,19 @@ poetry.lock
 .env
 .env.local
 .env.*.local
+.env.prod
+.env.staging
+deployment/.env.prod
+deployment/.env.staging
 
 # Log files
 *.log
+
+# Deployment secrets and sensitive data
+deployment/secrets/
+*.pem
+*.key
+*.crt
 
 # Generated protobuf files (uncomment if you want to ignore them)
 # *_pb2.py
