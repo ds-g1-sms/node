@@ -455,18 +455,34 @@ run_benchmark() {
     local temp_output=$(mktemp)
     
     log_info "Starting benchmark (this may take a few minutes)..."
+    echo
     
     # Run the Python benchmark
-    if python3 "$python_script" "$NUM_CLIENTS" "$MESSAGES_PER_CLIENT" "$NUM_ROOMS" "${node_urls[@]}" > "$temp_output" 2>&1; then
-        mv "$temp_output" "$OUTPUT_FILE"
-        log_success "Benchmark completed successfully"
-        return 0
-    else
-        log_error "Benchmark failed"
-        if [ "$VERBOSE" = true ]; then
-            cat "$temp_output"
+    # Redirect only stdout (JSON) to temp file, let stderr show progress
+    if python3 "$python_script" "$NUM_CLIENTS" "$MESSAGES_PER_CLIENT" "$NUM_ROOMS" "${node_urls[@]}" > "$temp_output"; then
+        # Validate JSON output
+        if python3 -m json.tool "$temp_output" > /dev/null 2>&1; then
+            mv "$temp_output" "$OUTPUT_FILE"
+            log_success "Benchmark completed successfully"
+            return 0
+        else
+            log_error "Benchmark produced invalid JSON output"
+            if [ "$VERBOSE" = true ]; then
+                log_info "Output content:"
+                cat "$temp_output"
+            fi
+            rm -f "$temp_output"
+            return 1
         fi
-        rm -f "$temp_output"
+    else
+        log_error "Benchmark execution failed"
+        if [ -f "$temp_output" ]; then
+            if [ "$VERBOSE" = true ]; then
+                log_info "Partial output:"
+                cat "$temp_output"
+            fi
+            rm -f "$temp_output"
+        fi
         return 1
     fi
 }
