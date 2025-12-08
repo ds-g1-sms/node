@@ -178,9 +178,11 @@ services:
       - target: 8080
         published: 8080
         protocol: tcp
+        mode: host
       - target: 9090
         published: 9090
         protocol: tcp
+        mode: host
     environment:
       - NODE_ID=node1
       - XMLRPC_PORT=9090
@@ -225,9 +227,11 @@ services:
       - target: 8080
         published: 8080
         protocol: tcp
+        mode: host
       - target: 9090
         published: 9090
         protocol: tcp
+        mode: host
     environment:
       - NODE_ID=node2
       - XMLRPC_PORT=9090
@@ -272,9 +276,11 @@ services:
       - target: 8080
         published: 8080
         protocol: tcp
+        mode: host
       - target: 9090
         published: 9090
         protocol: tcp
+        mode: host
     environment:
       - NODE_ID=node3
       - XMLRPC_PORT=9090
