@@ -5,6 +5,7 @@ Get the distributed chat system running on 3 VMs in under 15 minutes!
 ## Prerequisites
 
 Install these first:
+
 - [VirtualBox](https://www.virtualbox.org/wiki/Downloads) (6.1+)
 - [Vagrant](https://www.vagrantup.com/downloads) (2.3+)
 
@@ -32,7 +33,8 @@ This builds the image and deploys to the Swarm cluster.
 ⏱️ **Wait 30-60 seconds** for services to fully start after deployment.
 
 Each node runs on a different machine at port 8080:
-- **Node 1**: ws://192.168.56.101:8080 ✅ Recommended
+
+- **Node 1**: ws://192.168.56.101:8080
 - **Node 2**: ws://192.168.56.102:8080
 - **Node 3**: ws://192.168.56.103:8080
 
@@ -80,30 +82,35 @@ vagrant destroy -f
 
 ## Troubleshooting
 
-**See WebSocket errors in logs?**
-Errors like "EOFError", "426 Upgrade Required", or "missing Connection header" are NORMAL. They're from Docker health checks hitting the WebSocket port. Ignore them - the server is working fine!
+**See WebSocket errors in logs?** Errors like "EOFError", "426 Upgrade
+Required", or "missing Connection header" are NORMAL. They're from Docker health
+checks hitting the WebSocket port. Ignore them - the server is working fine!
 
 **Connection refused on port 8080?**
+
 - Wait 30-60 seconds after deployment for services to start
 - Run: `./scripts/troubleshoot-connectivity.sh` for detailed diagnostics
 - Check logs: `vagrant ssh node1 -c "docker service logs chat-demo_node1"`
 
 **VMs won't start?**
+
 - Check VirtualBox is installed: `VBoxManage --version`
 - Ensure you have 8GB RAM available
 
 **Services not deploying?**
+
 - Check Swarm: `vagrant ssh node1 -c "docker node ls"`
 - Check tasks: `vagrant ssh node1 -c "docker stack ps chat-demo"`
 
-**Error: "No such image: chat-node:demo"?**
-This means images weren't distributed to all nodes.
+**Error: "No such image: chat-node:demo"?** This means images weren't
+distributed to all nodes.
+
 1. Remove stack: `vagrant ssh node1 -c "docker stack rm chat-demo"`
 2. Wait 10 seconds
 3. Re-run: `./scripts/deploy-demo.sh` (it will fix the distribution)
 
-**Still having issues?**
-Run the troubleshooting script:
+**Still having issues?** Run the troubleshooting script:
+
 ```bash
 ./scripts/troubleshoot-connectivity.sh
 ```

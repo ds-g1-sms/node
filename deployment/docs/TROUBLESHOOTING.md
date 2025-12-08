@@ -1,6 +1,7 @@
 # Troubleshooting Guide - Distributed Chat System
 
-This guide helps diagnose and resolve common issues with the distributed chat system.
+This guide helps diagnose and resolve common issues with the distributed chat
+system.
 
 ## Table of Contents
 
@@ -37,6 +38,7 @@ docker node ls
 ### Issue: Stack Deploy Fails
 
 **Symptoms:**
+
 - `docker stack deploy` command fails
 - Error messages about compose file format
 - Services don't start
@@ -54,17 +56,20 @@ docker info | grep Swarm
 **Solutions:**
 
 1. **Not in Swarm mode**:
+
 ```bash
 docker swarm init --advertise-addr <IP>
 ```
 
 2. **Invalid compose file**:
+
 ```bash
 # Check for syntax errors
 docker-compose -f deployment/docker-compose.prod.yml config
 ```
 
 3. **Missing environment file**:
+
 ```bash
 # Create from example
 cp deployment/.env.example deployment/.env.prod
@@ -73,6 +78,7 @@ cp deployment/.env.example deployment/.env.prod
 ### Issue: Images Not Found
 
 **Symptoms:**
+
 - Error: "image not found"
 - Services stuck in "pending" state
 - Pull access denied errors
@@ -90,11 +96,13 @@ docker info | grep Registry
 **Solutions:**
 
 1. **Not logged into registry**:
+
 ```bash
 docker login
 ```
 
 2. **Wrong image name/tag**:
+
 ```bash
 # Check .env.prod settings
 cat deployment/.env.prod | grep REGISTRY
@@ -102,6 +110,7 @@ cat deployment/.env.prod | grep VERSION
 ```
 
 3. **Build and push image**:
+
 ```bash
 docker build -f Dockerfile.node -t yourusername/chat-node:v1.0 .
 docker push yourusername/chat-node:v1.0
@@ -110,6 +119,7 @@ docker push yourusername/chat-node:v1.0
 ### Issue: Node Placement Constraints Not Met
 
 **Symptoms:**
+
 - Services stuck in "pending" state
 - Error: "no suitable node"
 - Services don't distribute across machines
@@ -128,6 +138,7 @@ docker service inspect chat-system_node1 --format '{{ .Spec.TaskTemplate.Placeme
 **Solutions:**
 
 1. **Add missing labels**:
+
 ```bash
 docker node update --label-add node_type=node1 <NODE1-NAME>
 docker node update --label-add node_type=node2 <NODE2-NAME>
@@ -135,6 +146,7 @@ docker node update --label-add node_type=node3 <NODE3-NAME>
 ```
 
 2. **Verify labels**:
+
 ```bash
 for node in $(docker node ls -q); do
   echo "Node: $(docker node inspect $node --format '{{.Description.Hostname}}')"
@@ -147,6 +159,7 @@ done
 ### Issue: Service Keeps Restarting
 
 **Symptoms:**
+
 - Service shows "Starting" repeatedly
 - Restart count keeps increasing
 - Containers exit immediately
@@ -167,6 +180,7 @@ docker service ps chat-system_node1 --format "{{.Error}}"
 **Solutions:**
 
 1. **Configuration errors**:
+
 ```bash
 # Check environment variables
 docker service inspect chat-system_node1 --format '{{.Spec.TaskTemplate.ContainerSpec.Env}}'
@@ -176,6 +190,7 @@ docker service update --env-add NODE_ID=node1 chat-system_node1
 ```
 
 2. **Resource constraints**:
+
 ```bash
 # Check resource limits
 docker service inspect chat-system_node1 | grep -A 10 Resources
@@ -188,6 +203,7 @@ docker service update \
 ```
 
 3. **Port conflicts**:
+
 ```bash
 # Check if ports are already in use
 sudo netstat -tlnp | grep 8081
@@ -199,6 +215,7 @@ sudo netstat -tlnp | grep 9091
 ### Issue: Health Checks Failing
 
 **Symptoms:**
+
 - Container shows "unhealthy" status
 - Services restart frequently
 - Health check errors in logs
@@ -221,6 +238,7 @@ docker exec $(docker ps -q -f name=node1) \
 **Solutions:**
 
 1. **XML-RPC server not ready**:
+
 ```bash
 # Increase start_period in healthcheck
 docker service update \
@@ -229,12 +247,14 @@ docker service update \
 ```
 
 2. **Wrong health check port**:
+
 ```bash
 # Verify ports match configuration
 docker service inspect chat-system_node1 | grep -i port
 ```
 
 3. **Application error**:
+
 ```bash
 # Check application logs
 ./scripts/logs.sh -n node1 -t 100 | grep -i error
@@ -243,6 +263,7 @@ docker service inspect chat-system_node1 | grep -i port
 ### Issue: Service Not Accessible
 
 **Symptoms:**
+
 - Cannot connect to service from outside
 - Timeout errors
 - Connection refused
@@ -267,6 +288,7 @@ curl -I http://localhost:8081
 **Solutions:**
 
 1. **Firewall blocking**:
+
 ```bash
 # Check firewall rules
 sudo ufw status
@@ -277,6 +299,7 @@ sudo ufw allow 9091/tcp
 ```
 
 2. **Wrong port mapping**:
+
 ```bash
 # Check port configuration in compose file
 cat deployment/docker-compose.prod.yml | grep -A 5 "ports:"
@@ -289,6 +312,7 @@ docker service update \
 ```
 
 3. **Service not binding to correct interface**:
+
 ```bash
 # Check bind address in logs
 ./scripts/logs.sh -n node1 | grep "listening"
@@ -304,6 +328,7 @@ docker service update \
 ### Issue: Nodes Cannot Communicate
 
 **Symptoms:**
+
 - Peer connection errors
 - Timeout when contacting other nodes
 - "No route to host" errors
@@ -326,6 +351,7 @@ docker network inspect chat-system_chat-overlay \
 **Solutions:**
 
 1. **Overlay network not configured**:
+
 ```bash
 # Recreate network
 docker network rm chat-system_chat-overlay
@@ -333,6 +359,7 @@ docker stack deploy -c deployment/docker-compose.prod.yml chat-system
 ```
 
 2. **Firewall blocking overlay traffic**:
+
 ```bash
 # Open required ports on all nodes
 sudo ufw allow 7946/tcp
@@ -341,6 +368,7 @@ sudo ufw allow 4789/udp
 ```
 
 3. **Wrong peer addresses**:
+
 ```bash
 # Check peer configuration
 docker service inspect chat-system_node1 | grep PEER_NODES
@@ -354,6 +382,7 @@ docker service update \
 ### Issue: DNS Resolution Failures
 
 **Symptoms:**
+
 - "Name or service not known" errors
 - Cannot resolve node hostnames
 - Intermittent connectivity issues
@@ -372,6 +401,7 @@ docker exec $(docker ps -q -f name=node1) cat /etc/resolv.conf
 **Solutions:**
 
 1. **Use service names instead of container names**:
+
 ```bash
 # Service names should match compose file
 # Use: node1, node2, node3
@@ -379,6 +409,7 @@ docker exec $(docker ps -q -f name=node1) cat /etc/resolv.conf
 ```
 
 2. **Update DNS settings**:
+
 ```bash
 # Configure Docker daemon DNS
 sudo nano /etc/docker/daemon.json
@@ -392,6 +423,7 @@ sudo systemctl restart docker
 ### Issue: High CPU Usage
 
 **Symptoms:**
+
 - CPU usage consistently over 80%
 - Slow response times
 - Services becoming unresponsive
@@ -412,6 +444,7 @@ docker exec $(docker ps -q -f name=node1) top -b -n 1
 **Solutions:**
 
 1. **Increase CPU limits**:
+
 ```bash
 docker service update \
   --limit-cpu 2.0 \
@@ -420,6 +453,7 @@ docker service update \
 ```
 
 2. **Optimize application**:
+
 ```bash
 # Check for inefficient loops or operations in logs
 ./scripts/logs.sh -n node1 -f | grep -i "processing"
@@ -428,6 +462,7 @@ docker service update \
 ### Issue: High Memory Usage
 
 **Symptoms:**
+
 - Memory usage approaching limits
 - OOMKilled errors
 - Services restarting due to memory
@@ -449,6 +484,7 @@ docker service ps chat-system_node1 | grep -i oom
 **Solutions:**
 
 1. **Increase memory limits**:
+
 ```bash
 docker service update \
   --limit-memory 1G \
@@ -457,6 +493,7 @@ docker service update \
 ```
 
 2. **Investigate memory leaks**:
+
 ```bash
 # Enable debug logging
 docker service update \
@@ -472,6 +509,7 @@ watch -n 5 'docker stats --no-stream | grep node1'
 ### Issue: Lost Room Data
 
 **Symptoms:**
+
 - Rooms disappear after restart
 - User data not persisting
 - Inconsistent state across nodes
@@ -493,11 +531,13 @@ docker service inspect chat-system_node1 | grep -A 10 Mounts
 
 1. **This system uses in-memory storage** - data loss on restart is expected
 2. **For persistent data**, need to implement database backend
-3. **Current workaround**: Keep services running, use health checks for automatic recovery
+3. **Current workaround**: Keep services running, use health checks for
+   automatic recovery
 
 ### Issue: Stale Member Cleanup Not Working
 
 **Symptoms:**
+
 - Disconnected users still show as active
 - Members not removed after timeout
 - Cleanup task not running
@@ -515,11 +555,13 @@ docker service inspect chat-system_node1 | grep -i cleanup
 **Solutions:**
 
 1. **Verify cleanup task is running**:
+
 ```bash
 ./scripts/logs.sh -n node1 | grep "Starting stale member cleanup"
 ```
 
 2. **Adjust cleanup interval**:
+
 ```bash
 docker service update \
   --env-add CLEANUP_INTERVAL=30 \
@@ -545,6 +587,7 @@ docker service update \
 **Cause**: XML-RPC server not started or wrong port
 
 **Solution**:
+
 ```bash
 # Check if server is listening
 docker exec $(docker ps -q -f name=node1) netstat -tlnp | grep 9090
@@ -558,6 +601,7 @@ docker exec $(docker ps -q -f name=node1) netstat -tlnp | grep 9090
 **Cause**: Too many containers on overlay network
 
 **Solution**:
+
 ```bash
 # Use larger subnet
 # Edit docker-compose.prod.yml:
@@ -588,6 +632,7 @@ docker service update \
 If issues persist:
 
 1. **Collect diagnostics**:
+
 ```bash
 # Save logs
 ./scripts/logs.sh -a > /tmp/debug-logs-$(date +%Y%m%d).log
@@ -597,6 +642,7 @@ docker service inspect chat-system_node1 > /tmp/service-inspect.json
 ```
 
 2. **Create issue report** with:
+
    - Error messages
    - Log excerpts
    - Service configuration

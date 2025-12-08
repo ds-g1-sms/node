@@ -157,11 +157,6 @@ vagrant ssh node1 -c "ping -c 2 192.168.56.103 > /dev/null 2>&1" && print_succes
 vagrant ssh node2 -c "ping -c 2 192.168.56.103 > /dev/null 2>&1" && print_success "node2 -> node3: OK" || print_error "node2 -> node3: FAIL"
 echo ""
 
-# Check ingress network
-print_info "Checking Docker ingress network..."
-vagrant ssh node1 -c "docker network inspect ingress --format '{{range .Containers}}{{.Name}} {{end}}'" 2>&1
-echo ""
-
 # Recommendations
 echo "=========================================="
 echo "Recommendations"
