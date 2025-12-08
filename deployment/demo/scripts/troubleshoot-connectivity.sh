@@ -131,12 +131,13 @@ echo ""
 
 # Test port connectivity from each VM
 print_info "Testing port connectivity from VMs..."
-for port in 8081 8082 8083; do
-    echo "Testing port $port..."
-    if vagrant ssh node1 -c "curl -s -o /dev/null -w '%{http_code}' http://localhost:$port --connect-timeout 5" 2>&1 | grep -q "000\|52"; then
-        print_warning "Port $port not responding (service may still be starting)"
+echo "Testing WebSocket port 8080 on each node..."
+for node_ip in 192.168.56.101 192.168.56.102 192.168.56.103; do
+    node_name=$(echo $node_ip | sed 's/192.168.56.10/node/')
+    if vagrant ssh node1 -c "curl -s -o /dev/null -w '%{http_code}' http://$node_ip:8080 --connect-timeout 5" 2>&1 | grep -q "000\|52"; then
+        print_warning "Port 8080 on $node_name ($node_ip) not responding (service may still be starting)"
     else
-        print_success "Port $port is accessible"
+        print_success "Port 8080 on $node_name ($node_ip) is accessible"
     fi
 done
 echo ""
@@ -173,10 +174,10 @@ echo ""
 echo "2. Check service logs for startup errors:"
 echo "   vagrant ssh node1 -c 'docker service logs -f chat-demo_node1'"
 echo ""
-echo "3. Try accessing from any node in the swarm:"
-echo "   curl http://192.168.56.101:8081"
-echo "   curl http://192.168.56.102:8081"
-echo "   curl http://192.168.56.103:8081"
+echo "3. Try accessing each node (all use port 8080):"
+echo "   curl http://192.168.56.101:8080"
+echo "   curl http://192.168.56.102:8080"
+echo "   curl http://192.168.56.103:8080"
 echo ""
 echo "4. If containers keep restarting, check for application errors:"
 echo "   vagrant ssh node1 -c 'docker service ps chat-demo_node1 --no-trunc'"
