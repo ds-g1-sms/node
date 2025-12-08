@@ -41,9 +41,12 @@ print_error() {
 
 # Check if we're in the right directory
 if [ ! -f "$DEMO_DIR/Vagrantfile" ]; then
-    print_error "Must be run from deployment/demo directory"
+    print_error "Vagrantfile not found at $DEMO_DIR"
     exit 1
 fi
+
+# Change to demo directory for all vagrant commands
+cd "$DEMO_DIR"
 
 print_info "Starting demo deployment..."
 echo ""
@@ -66,16 +69,19 @@ echo ""
 
 # Build Docker image
 print_info "Building Docker image..."
-cd "$PROJECT_ROOT"
 
 # Check if we should build locally or use existing
 if docker info &>/dev/null; then
     print_info "Building image locally..."
-    docker build -f Dockerfile.node -t chat-node:demo .
+    # Build from project root
+    (cd "$PROJECT_ROOT" && docker build -f Dockerfile.node -t chat-node:demo .)
     
     # Save image to file in demo directory (accessible to VMs via /vagrant)
     print_info "Saving image to transfer to VMs..."
     docker save chat-node:demo -o "$DEMO_DIR/chat-node-demo.tar"
+    
+    # Change back to demo directory for vagrant commands
+    cd "$DEMO_DIR"
     
     # Load image on all VMs
     for node in node1 node2 node3; do
@@ -104,6 +110,9 @@ if docker info &>/dev/null; then
     print_success "Image loaded and verified on all nodes"
 else
     print_warning "Docker not available on host. Building image on VMs..."
+    
+    # Change to demo directory for vagrant commands
+    cd "$DEMO_DIR"
     
     # Build on manager node
     print_info "Building image on node1..."
