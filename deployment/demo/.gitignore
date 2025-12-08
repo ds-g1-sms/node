@@ -13,5 +13,10 @@ docker-compose.demo.yml
 # Docker image tarballs
 *.tar
 
+# Benchmark results
+benchmark-results.json
+benchmark-results.html
+benchmark_client.py
+
 # VirtualBox
 *.vbox-prev

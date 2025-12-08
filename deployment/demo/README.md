@@ -245,6 +245,67 @@ Host Machine (your computer)
     └── Overlay Network: Docker Swarm (chat-overlay)
 ```
 
+## Performance Benchmarking
+
+The demo includes a comprehensive load testing script to measure system performance:
+
+### Running the Benchmark
+
+```bash
+# Basic benchmark with defaults (10 clients, 100 messages each)
+./scripts/benchmark-load.sh
+
+# Custom configuration
+./scripts/benchmark-load.sh -c 50 -m 200 -r 5 -d 120
+
+# Options:
+#   -c, --clients NUM       Number of concurrent clients (default: 10)
+#   -m, --messages NUM      Messages per client (default: 100)
+#   -r, --rooms NUM         Number of rooms to test (default: 3)
+#   -d, --duration SEC      Test duration in seconds (default: 60)
+#   -o, --output FILE       Output file for results (default: benchmark-results.json)
+#   -v, --verbose           Verbose output
+#   -h, --help              Show help message
+```
+
+### Benchmark Metrics
+
+The benchmark measures:
+
+- **Throughput**: Messages per second across all clients
+- **Latency**: Average, median, min, max, p95, p99
+- **Success Rate**: Percentage of successfully sent messages
+- **Error Rate**: Failed operations during test
+- **Per-Client Metrics**: Individual client performance stats
+
+### Output Files
+
+- **benchmark-results.json**: Detailed results in JSON format
+- **benchmark-results.html**: Visual report with charts and tables
+
+### Example Output
+
+```
+SUMMARY
+======================================================================
+Total Duration:        45.23 seconds
+Messages Sent:         5,000
+Messages Received:     4,987
+Errors:                0
+Clients Connected:     50
+Success Rate:          100.00%
+Overall Throughput:    110.52 msg/sec
+
+LATENCY STATISTICS
+======================================================================
+Average:               45.32 ms
+Median:                42.10 ms
+Min:                   8.45 ms
+Max:                   156.78 ms
+95th Percentile:       89.23 ms
+99th Percentile:       125.45 ms
+```
+
 ## Troubleshooting
 
 ### VMs won't start
