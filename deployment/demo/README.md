@@ -120,11 +120,11 @@ vagrant ssh node1 -c "cd /vagrant && docker stack deploy -c docker-compose.demo.
 
 ### 5. Access the System
 
-Once deployed, you can access the nodes:
+Once deployed, you can access the nodes at port 8080 on each machine:
 
-- **Node 1**: http://192.168.56.101:8081 (WebSocket)
-- **Node 2**: http://192.168.56.102:8082 (WebSocket)
-- **Node 3**: http://192.168.56.103:8083 (WebSocket)
+- **Node 1**: ws://192.168.56.101:8080 (WebSocket)
+- **Node 2**: ws://192.168.56.102:8080 (WebSocket)
+- **Node 3**: ws://192.168.56.103:8080 (WebSocket)
 
 Connect using the chat client:
 
@@ -133,7 +133,7 @@ Connect using the chat client:
 poetry run chat-client
 ```
 
-Then connect to any of the nodes using their IP:port (e.g., `192.168.56.101:8081`)
+Then connect to any of the nodes using their IP:port (e.g., `ws://192.168.56.101:8080`)
 
 ## VM Network Configuration
 
@@ -141,9 +141,11 @@ The demo creates a private network with the following configuration:
 
 | VM | Hostname | IP Address | WebSocket Port | XML-RPC Port |
 |----|----------|------------|----------------|--------------|
-| node1 | chat-node1 | 192.168.56.101 | 8081 | 9091 |
-| node2 | chat-node2 | 192.168.56.102 | 8082 | 9092 |
-| node3 | chat-node3 | 192.168.56.103 | 8083 | 9093 |
+| node1 | chat-node1 | 192.168.56.101 | 8080 | 9090 |
+| node2 | chat-node2 | 192.168.56.102 | 8080 | 9090 |
+| node3 | chat-node3 | 192.168.56.103 | 8080 | 9090 |
+
+Since each node runs on a different machine with a unique IP address, they all use the same ports (8080 for WebSocket, 9090 for XML-RPC) without conflicts.
 
 ## Useful Commands
 
@@ -341,7 +343,7 @@ The WebSocket server is working correctly. These errors don't affect functionali
 
 ### Can't connect from chat client
 
-**Common Issue**: Connection refused on port 8081/8082/8083
+**Common Issue**: Connection refused on port 8080
 
 This usually happens if services are still starting up. Docker Swarm services can take 30-60 seconds to fully initialize.
 
@@ -361,34 +363,28 @@ This usually happens if services are still starting up. Docker Swarm services ca
 
 3. **Test from inside a VM**:
    ```bash
-   vagrant ssh node1 -c "curl -v http://localhost:8081"
+   vagrant ssh node1 -c "curl -v http://localhost:8080"
    ```
    If this works but external access doesn't, it's a networking issue.
 
-4. **Verify Swarm ingress networking**:
-   ```bash
-   vagrant ssh node1 -c "docker network inspect ingress"
-   ```
-   Should show all nodes in the swarm.
-
-5. **Check if containers are running**:
+4. **Check if containers are running**:
    ```bash
    vagrant ssh node1 -c "docker ps"
    vagrant ssh node2 -c "docker ps"
    vagrant ssh node3 -c "docker ps"
    ```
 
-6. **Verify port publishing**:
+5. **Verify port publishing**:
    ```bash
    vagrant ssh node1 -c "docker service inspect chat-demo_node1 --format '{{json .Endpoint.Ports}}'"
    ```
 
-7. **Try accessing from any Swarm node** (Swarm ingress routing):
-   - http://192.168.56.101:8081 (from manager)
-   - http://192.168.56.102:8081 (from worker 1)
-   - http://192.168.56.103:8081 (from worker 2)
+6. **Connect to the correct node IP**:
+   - Node 1: ws://192.168.56.101:8080
+   - Node 2: ws://192.168.56.102:8080
+   - Node 3: ws://192.168.56.103:8080
    
-   All should work due to Swarm's routing mesh!
+   Each node is accessible on its own IP at port 8080.
 
 ## Customization
 

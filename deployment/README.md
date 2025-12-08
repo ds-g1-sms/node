@@ -159,20 +159,22 @@ Key environment variables (see `.env.example` for complete list):
 |----------|-------------|---------|
 | `REGISTRY` | Container registry URL | `ghcr.io/ds-g1-sms` |
 | `VERSION` | Image version/tag | `latest` |
-| `NODE1_WS_PORT` | Node 1 WebSocket port | `8081` |
-| `NODE2_WS_PORT` | Node 2 WebSocket port | `8082` |
-| `NODE3_WS_PORT` | Node 3 WebSocket port | `8083` |
+| `NODE1_WS_PORT` | Node 1 WebSocket port | `8080` |
+| `NODE2_WS_PORT` | Node 2 WebSocket port | `8080` |
+| `NODE3_WS_PORT` | Node 3 WebSocket port | `8080` |
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `CPU_LIMIT` | CPU limit per service | `1.0` |
 | `MEMORY_LIMIT` | Memory limit per service | `512M` |
 
 ## Port Mapping
 
+Since each node runs on a separate machine with a unique IP address, all nodes use the same ports:
+
 | Node | WebSocket (Client) | XML-RPC (Inter-node) |
 |------|-------------------|---------------------|
-| Node 1 | 8081 | 9091 |
-| Node 2 | 8082 | 9092 |
-| Node 3 | 8083 | 9093 |
+| Node 1 | 8080 | 9090 |
+| Node 2 | 8080 | 9090 |
+| Node 3 | 8080 | 9090 |
 
 ## Network Architecture
 
@@ -183,8 +185,8 @@ Key environment variables (see `.env.example` for complete list):
 │  Machine 1    │ Machine 2  │  Machine 3     │
 │  ┌─────────┐  │ ┌────────┐ │  ┌─────────┐   │
 │  │ Node 1  │  │ │ Node 2 │ │  │ Node 3  │   │
-│  │ :8081   │  │ │ :8082  │ │  │ :8083   │   │
-│  │ :9091   │  │ │ :9092  │ │  │ :9093   │   │
+│  │ :8080   │  │ │ :8080  │ │  │ :8080   │   │
+│  │ :9090   │  │ │ :9090  │ │  │ :9090   │   │
 │  └─────────┘  │ └────────┘ │  └─────────┘   │
 └───────────────┴────────────┴────────────────┘
            │         │         │
@@ -207,7 +209,7 @@ Key environment variables (see `.env.example` for complete list):
 
 ### Network
 - Open ports: 2377, 7946, 4789 (Swarm)
-- Open ports: 8081-8083, 9091-9093 (Application)
+- Open ports: 8080, 9090 (Application - same on each machine)
 - Network connectivity between all machines
 
 ## Support and Troubleshooting

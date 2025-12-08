@@ -18,11 +18,11 @@ services:
       - chat-overlay
     ports:
       - target: 8080
-        published: ${NODE1_WS_PORT:-8081}
+        published: ${NODE1_WS_PORT:-8080}
         protocol: tcp
         mode: host
       - target: 9090
-        published: ${NODE1_XMLRPC_PORT:-9091}
+        published: ${NODE1_XMLRPC_PORT:-9090}
         protocol: tcp
         mode: host
     environment:
@@ -83,11 +83,11 @@ services:
       - chat-overlay
     ports:
       - target: 8080
-        published: ${NODE2_WS_PORT:-8082}
+        published: ${NODE2_WS_PORT:-8080}
         protocol: tcp
         mode: host
       - target: 9090
-        published: ${NODE2_XMLRPC_PORT:-9092}
+        published: ${NODE2_XMLRPC_PORT:-9090}
         protocol: tcp
         mode: host
     environment:
@@ -148,11 +148,11 @@ services:
       - chat-overlay
     ports:
       - target: 8080
-        published: ${NODE3_WS_PORT:-8083}
+        published: ${NODE3_WS_PORT:-8080}
         protocol: tcp
         mode: host
       - target: 9090
-        published: ${NODE3_XMLRPC_PORT:-9093}
+        published: ${NODE3_XMLRPC_PORT:-9090}
         protocol: tcp
         mode: host
     environment:

@@ -147,12 +147,12 @@ cat > demo.env <<EOF
 # Demo Environment Configuration
 REGISTRY=
 VERSION=demo
-NODE1_WS_PORT=8081
-NODE2_WS_PORT=8082
-NODE3_WS_PORT=8083
-NODE1_XMLRPC_PORT=9091
-NODE2_XMLRPC_PORT=9092
-NODE3_XMLRPC_PORT=9093
+NODE1_WS_PORT=8080
+NODE2_WS_PORT=8080
+NODE3_WS_PORT=8080
+NODE1_XMLRPC_PORT=9090
+NODE2_XMLRPC_PORT=9090
+NODE3_XMLRPC_PORT=9090
 LOG_LEVEL=INFO
 CPU_LIMIT=1.0
 MEMORY_LIMIT=512M
@@ -176,10 +176,10 @@ services:
       - chat-overlay
     ports:
       - target: 8080
-        published: 8081
+        published: 8080
         protocol: tcp
       - target: 9090
-        published: 9091
+        published: 9090
         protocol: tcp
     environment:
       - NODE_ID=node1
@@ -223,10 +223,10 @@ services:
       - chat-overlay
     ports:
       - target: 8080
-        published: 8082
+        published: 8080
         protocol: tcp
       - target: 9090
-        published: 9092
+        published: 9090
         protocol: tcp
     environment:
       - NODE_ID=node2
@@ -270,10 +270,10 @@ services:
       - chat-overlay
     ports:
       - target: 8080
-        published: 8083
+        published: 8080
         protocol: tcp
       - target: 9090
-        published: 9093
+        published: 9090
         protocol: tcp
     environment:
       - NODE_ID=node3
@@ -351,15 +351,14 @@ echo "=========================================="
 print_success "Demo deployment complete!"
 echo "=========================================="
 echo ""
-echo "IMPORTANT: With Docker Swarm's ingress networking, you can access"
-echo "all services from ANY node's IP address:"
+echo "Each node runs on a separate machine at port 8080:"
 echo ""
-echo "Access points (any of these IPs work for any service):"
-echo "  - http://192.168.56.101:8081 (or :8082 or :8083)"
-echo "  - http://192.168.56.102:8081 (or :8082 or :8083)"
-echo "  - http://192.168.56.103:8081 (or :8082 or :8083)"
+echo "Access points:"
+echo "  - Node 1: ws://192.168.56.101:8080"
+echo "  - Node 2: ws://192.168.56.102:8080"
+echo "  - Node 3: ws://192.168.56.103:8080"
 echo ""
-echo "Recommended: Connect to http://192.168.56.101:8081"
+echo "Recommended: Connect to ws://192.168.56.101:8080"
 echo ""
 echo "To check logs:"
 echo "  vagrant ssh node1 -c 'docker service logs -f chat-demo_node1'"
@@ -368,7 +367,7 @@ echo "To check health:"
 echo "  vagrant ssh node1 -c 'docker stack ps chat-demo'"
 echo ""
 echo "To test connectivity:"
-echo "  curl -v http://192.168.56.101:8081"
+echo "  curl -v http://192.168.56.101:8080"
 echo ""
 echo "To remove deployment:"
 echo "  vagrant ssh node1 -c 'docker stack rm chat-demo'"

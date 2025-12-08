@@ -31,10 +31,10 @@ This builds the image and deploys to the Swarm cluster.
 
 ⏱️ **Wait 30-60 seconds** for services to fully start after deployment.
 
-Access points (thanks to Swarm's routing mesh, use ANY IP):
-- http://192.168.56.101:8081 ✅ Recommended
-- http://192.168.56.102:8081
-- http://192.168.56.103:8081
+Each node runs on a different machine at port 8080:
+- **Node 1**: ws://192.168.56.101:8080 ✅ Recommended
+- **Node 2**: ws://192.168.56.102:8080
+- **Node 3**: ws://192.168.56.103:8080
 
 From project root, run the client:
 
@@ -42,7 +42,7 @@ From project root, run the client:
 poetry run chat-client
 ```
 
-Connect to `192.168.56.101:8081`.
+Connect to `ws://192.168.56.101:8080`.
 
 ## Verify It's Working
 
@@ -83,7 +83,7 @@ vagrant destroy -f
 **See WebSocket errors in logs?**
 Errors like "EOFError", "426 Upgrade Required", or "missing Connection header" are NORMAL. They're from Docker health checks hitting the WebSocket port. Ignore them - the server is working fine!
 
-**Connection refused on port 8081?**
+**Connection refused on port 8080?**
 - Wait 30-60 seconds after deployment for services to start
 - Run: `./scripts/troubleshoot-connectivity.sh` for detailed diagnostics
 - Check logs: `vagrant ssh node1 -c "docker service logs chat-demo_node1"`
