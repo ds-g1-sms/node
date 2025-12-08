@@ -148,7 +148,7 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-if ! "${SCRIPT_DIR}/benchmark-load.sh" -h &> /dev/null; then
+if [[ ! -x "${SCRIPT_DIR}/benchmark-load.sh" ]]; then
     log_error "benchmark-load.sh not found or not executable"
     exit 1
 fi
@@ -169,7 +169,7 @@ log "Timestamp: ${TIMESTAMP}"
 log ""
 
 for scenario in "${!ACTIVE_SCENARIOS[@]}"; do
-    ((SCENARIO_COUNT++))
+    ((SCENARIO_COUNT++)) || true
     
     # Parse scenario parameters
     IFS=' ' read -r clients messages rooms duration <<< "${ACTIVE_SCENARIOS[$scenario]}"
