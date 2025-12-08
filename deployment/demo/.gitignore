@@ -1,0 +1,17 @@
+# Vagrant
+.vagrant/
+*.log
+
+# Swarm tokens
+swarm-token.txt
+swarm-manager-ip.txt
+
+# Demo generated files
+demo.env
+docker-compose.demo.yml
+
+# Docker image tarballs
+*.tar
+
+# VirtualBox
+*.vbox-prev

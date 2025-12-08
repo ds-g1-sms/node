@@ -2,6 +2,20 @@
 
 This directory contains all deployment configurations, scripts, and documentation for the distributed chat system.
 
+## 🚀 Try the Demo First!
+
+**New to the system?** Try our automated VM demo that sets up 3 virtual machines with full Swarm orchestration:
+
+```bash
+cd demo
+vagrant up
+./scripts/deploy-demo.sh
+```
+
+See [demo/QUICKSTART.md](demo/QUICKSTART.md) for a 15-minute walkthrough, or [demo/README.md](demo/README.md) for full documentation.
+
+---
+
 ## Quick Start
 
 ### Production Deployment (Multi-Host)
@@ -44,6 +58,11 @@ deployment/
 ├── docker-compose.prod.yml         # Production Swarm configuration
 ├── docker-compose.dev.yml          # Development overrides
 ├── .env.example                    # Environment variables template
+├── demo/                           # 🆕 Multi-VM demo environment
+│   ├── Vagrantfile                 # VM provisioning
+│   ├── QUICKSTART.md               # 15-min getting started
+│   ├── README.md                   # Full demo documentation
+│   └── scripts/                    # Demo deployment scripts
 ├── configs/                        # Node-specific configurations
 │   ├── node1.env
 │   ├── node2.env
