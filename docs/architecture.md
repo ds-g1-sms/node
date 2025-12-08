@@ -6,34 +6,66 @@ ______________________________________________________________________
 
 ### System Components
 
+The implemented system consists of the following components:
+
 1. **Node Types** (all nodes are equal peers)
 
    - Each node runs the full chat service stack
-   - Each node can host chat rooms
-   - Minimum 3 nodes for fault tolerance
+   - Each node can host multiple chat rooms
+   - Minimum 3 nodes recommended for fault tolerance
 
-2. **State Management Layer**
+2. **State Management Layer** (`room_state.py`)
 
-   - **In-Memory State**: For active chat rooms and messages
-   - **Optional Persistent Storage**: For future chat history (not in initial
-     prototype)
-   - **Room Distribution**: Rooms distributed across nodes
+   - **In-Memory State**: Active chat rooms, messages, and member information
+   - **RoomStateManager**: Central state management with thread-safe operations
+   - **MemberInfo**: Tracks room members with activity timestamps
+   - **NodeHealth**: Monitors peer node health with heartbeat tracking
+   - **Room Distribution**: Each node hosts its own rooms independently
 
 3. **Coordination Layer**
 
    - **Administrator-Based Message Ordering**: Room creator/admin decides
      message order
-   - **Two-Phase Commit Protocol**: For room deletion coordination
-     - Simpler than Raft, sufficient for coordinated operations
-     - Easier to implement and understand
-     - Acceptable trade-off with node failure scenarios
+   - **Two-Phase Commit Protocol**: Implemented for room deletion coordination
+     - Phase 1: Prepare (all nodes check readiness)
+     - Phase 2: Commit or Rollback
+     - Handles coordinated room deletion across nodes
+   - **Health Monitoring**: Periodic heartbeat checks between nodes
+   - **Disconnect Detection**: Automatic cleanup of inactive members
 
-4. **Consistency Approach**
+4. **Communication Layers**
+
+   - **WebSocket Server** (`websocket_server.py`): Handles client connections
+     - Processes client requests (list rooms, create room, join room, send message)
+     - Manages real-time bidirectional communication
+     - Coordinates with XML-RPC server for distributed operations
+   
+   - **XML-RPC Server** (`xmlrpc_server.py`): Inter-node communication
+     - Exposes methods for peer-to-peer operations
+     - Handles room discovery, message forwarding, and coordination
+     - Implements 2PC protocol for room deletion
+     - Provides heartbeat endpoint for health checks
+
+5. **Modular Architecture**
+
+   - **Schemas Module** (`schemas/`): Standardized data structures
+     - `messages.py`: Message data structures and confirmations
+     - `events.py`: Member join/leave and room deletion events
+     - `responses.py`: Success and error response formats
+   
+   - **Utils Module** (`utils/`): Reusable utility functions
+     - `broadcast.py`: Peer broadcast functionality
+     - `validation.py`: Input validation utilities
+   
+   - **Peer Registry** (`peer_registry.py`): Manages peer node connections
+
+6. **Consistency Approach**
 
    - **Administrator Authority**: The node hosting a room acts as authority for
      that room
    - **Message Ordering**: Administrator node determines final message order
    - **Membership Management**: Administrator handles join/leave operations
+   - **Sequence Numbers**: Messages assigned sequential numbers for ordering
 
 ## Requirements
 
@@ -133,8 +165,8 @@ simpler.
 
 - Rooms hosted on failed node become unavailable
 - Users in those rooms are disconnected
-- For prototype: Simple detection and notification
-- Future enhancement: Room migration to another node
+- Health monitoring detects failures through heartbeat mechanism
+- Rooms can be recreated on other nodes
 
 **Member Node Failure**:
 
@@ -142,14 +174,26 @@ simpler.
 - Administrator removes user from room member list
 - No impact on room availability
 
-**Fault Tolerance Strategies** (for prototype):
+**Implemented Fault Tolerance Strategies**:
 
-1. **Health Checks**: Basic heartbeat between nodes
-2. **Failure Detection**: Timeout-based detection
+1. **Health Checks**: Heartbeat mechanism between nodes
+   - Configurable intervals (default: 30 seconds)
+   - Timeout detection (default: 2 seconds per check)
+   - Maximum failure tracking before node marked as failed
+   
+2. **Failure Detection**: 
+   - Timeout-based detection for heartbeat failures
+   - Inactivity timeout for member cleanup (default: 15 minutes)
+   - Automatic cleanup tasks run periodically (default: 60 seconds)
+   
 3. **Graceful Degradation**: Rooms survive as long as admin node is up
-4. **User Notification**: Inform users when rooms become unavailable
 
-**Future Enhancements** (beyond prototype):
+4. **Disconnect Notifications**: 
+   - Peer nodes notified when members disconnect
+   - Automatic member list synchronization
+   - Room member counts updated in real-time
+
+**Future Enhancements** (not yet implemented):
 
 - Room replication across multiple nodes
 - Automatic room migration on node failure
@@ -209,35 +253,45 @@ simpler.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Client Layer (Co-located)                │
-│     Simple clients on same nodes as servers for prototype   │
+│                    Client Layer (Textual UI)                │
+│     Terminal-based chat client with rich UI                 │
 └─────────────────┬───────────────────────────────────────────┘
                   │ WebSocket
 ┌─────────────────┴───────────────────────────────────────────┐
 │                    Node 1 (Peer & Admin for Room A)         │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │ Client Handler (WebSocket)                           │   │
+│  │ WebSocketServer (websocket_server.py)                │   │
+│  │  - Client connection handling                        │   │
+│  │  - Request processing (list, create, join, message)  │   │
+│  │  - Room member tracking                              │   │
 │  └──────────────┬───────────────────────────────────────┘   │
 │  ┌──────────────┴───────────────────────────────────────┐   │
 │  │ Business Logic Layer                                 │   │
-│  │  - Room Management (Admin for owned rooms)           │   │
-│  │  - Message Ordering (for administered rooms)         │   │
-│  │  - Member Management                                 │   │
+│  │  - RoomStateManager (room_state.py)                  │   │
+│  │  - Message Ordering & Sequence Numbers               │   │
+│  │  - Member Management with Activity Tracking          │   │
+│  │  - Health Monitoring (NodeHealth, MemberInfo)        │   │
 │  └──────────────┬───────────────────────────────────────┘   │
 │  ┌──────────────┴───────────────────────────────────────┐   │
-│  │ Coordination Layer                                   │   │
-│  │  - Two-Phase Commit (for deletion)                   │   │
-│  │  - Node Discovery & Communication                    │   │
+│  │ XMLRPCServer (xmlrpc_server.py)                      │   │
+│  │  - Inter-node Communication                          │   │
+│  │  - Room Discovery (get_hosted_rooms)                 │   │
+│  │  - Message Forwarding & Broadcasting                 │   │
+│  │  - 2PC Protocol (prepare/commit/rollback)            │   │
+│  │  - Heartbeat endpoint                                │   │
+│  └──────────────┬───────────────────────────────────────┘   │
+│  ┌──────────────┴───────────────────────────────────────┐   │
+│  │ Modular Components                                   │   │
+│  │  - schemas/ (messages, events, responses)            │   │
+│  │  - utils/ (broadcast, validation)                    │   │
+│  │  - PeerRegistry (peer_registry.py)                   │   │
 │  └──────────────┬───────────────────────────────────────┘   │
 │  ┌──────────────┴───────────────────────────────────────┐   │
 │  │ State Layer (In-Memory)                              │   │
-│  │  - Local Room State (Room A)                         │   │
-│  │  - Connected Users                                   │   │
-│  │  - Message Buffer (no history before join)           │   │
-│  └──────────────┬───────────────────────────────────────┘   │
-│  ┌──────────────┴───────────────────────────────────────┐   │
-│  │ Optional: Future Persistent Storage                  │   │
-│  │  - CockroachDB (for chat history)                    │   │
+│  │  - Room States (RoomState dataclass)                 │   │
+│  │  - Member Information (MemberInfo)                   │   │
+│  │  - Message History per Room                          │   │
+│  │  - Node Health Status (NodeHealth)                   │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────┬───────────────────────────────────────────┘
                   │ XML-RPC (Server-to-Server Communication)
@@ -248,50 +302,63 @@ simpler.
     │ (Room B) │      │ (Room C) │     │ (Room A) │
     └──────────┘      └──────────┘     └──────────┘
     (Each node administers its own room(s))
+    
+    XML-RPC Methods:
+    • get_hosted_rooms() - Discover rooms on peer nodes
+    • join_room() - Join remote rooms
+    • forward_message() - Forward messages to admin node
+    • receive_message_broadcast() - Receive broadcasted messages
+    • receive_member_event_broadcast() - Receive member events
+    • heartbeat() - Health check endpoint
+    • prepare/commit/rollback_delete_room() - 2PC for deletion
 ```
 
-## Prototype Implementation Approach
+## Implementation Status
 
-### Simplest Running Prototype
+### Implemented Features
 
-Focus on getting a working system quickly, then add features:
+The following features have been successfully implemented:
 
-**Phase 1 - Basic Prototype**:
+**Core Functionality**:
 
-- **Fixed chat rooms**: One room per server (3 rooms for 3 nodes)
-- **No persistent storage**: All state in memory
-- **No history**: Clients only see messages sent after they join
-- **Group chat only**: No private messaging needed for prototype
-- **Co-located clients**: Clients run on same machines as servers
-- **Focus**: Server-to-server communication for message distribution
+- ✅ **Dynamic room creation**: Clients can create rooms on any node
+- ✅ **Room discovery mechanism**: Global room discovery across all peer nodes
+- ✅ **In-memory state management**: All room and member state maintained in memory
+- ✅ **Group chat**: Multi-user chat rooms with real-time messaging
+- ✅ **Textual UI client**: Rich terminal-based user interface with multiple screens
+- ✅ **Server-to-server communication**: Full XML-RPC implementation for peer coordination
 
-**Key Implementation Notes**:
+**Distributed Features**:
 
-- Course focus is on **server-to-server communication** - this is the priority
-- Client implementation can be very simple (even command-line)
-- Keep extensibility in mind for adding features later
-- Design should allow adding dynamic rooms and persistence before demo
+- ✅ **Administrator-based message ordering**: Room creator assigns sequence numbers
+- ✅ **Message forwarding**: Non-admin nodes forward messages to admin node
+- ✅ **Message broadcasting**: Admin nodes broadcast ordered messages to all peers
+- ✅ **Member join/leave coordination**: Events synchronized across all nodes
+- ✅ **Room deletion with 2PC**: Two-phase commit protocol for coordinated deletion
 
-**Benefits of Simple Start**:
+**Fault Tolerance**:
 
-- Get running system quickly
-- Demonstrate core distributed concepts
-- Test server-to-server communication thoroughly
-- Working foundation to build upon
-- Less time learning complex frameworks (Raft, DHT)
+- ✅ **Health monitoring**: Periodic heartbeat checks between nodes
+- ✅ **Disconnect detection**: Automatic detection and cleanup of disconnected members
+- ✅ **Inactivity timeouts**: Stale member cleanup after configurable timeout
+- ✅ **Node failure handling**: Failed nodes detected via heartbeat mechanism
 
-### Phase 2 - Enhanced Prototype (If Time Permits)
+**Code Organization**:
 
-Add features incrementally:
+- ✅ **Modular architecture**: Schemas and utils modules for code reuse
+- ✅ **Standardized data structures**: Consistent message, event, and response formats
+- ✅ **Broadcast utilities**: Reusable functions for peer communication
+- ✅ **Input validation**: Message content validation utilities
 
-- Dynamic room creation (clients can create rooms on any node)
-- Room discovery mechanism across nodes
-- Basic persistence (CockroachDB for chat history)
-- Client history retrieval upon joining
-- Room deletion with two-phase commit
+### Not Yet Implemented
 
-**Design Principle**: Build simple first, but architect with extensibility in
-mind so features can be added just before demo if time allows.
+**Future Enhancements** (beyond current scope):
+
+- ⏸️ **Persistent storage**: No database integration (all state is in-memory)
+- ⏸️ **Chat history**: Messages only available while room is active
+- ⏸️ **Room replication**: No redundancy for room state
+- ⏸️ **Automatic room migration**: Rooms unavailable if admin node fails
+- ⏸️ **Private messaging**: System supports group chat only
 
 ### Development Environment
 
