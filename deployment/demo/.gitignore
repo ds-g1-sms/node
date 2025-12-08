@@ -17,6 +17,7 @@ docker-compose.demo.yml
 benchmark-results.json
 benchmark-results.html
 benchmark_client.py
+benchmark-suite-results/
 
 # VirtualBox
 *.vbox-prev

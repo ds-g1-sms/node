@@ -306,6 +306,87 @@ Max:                   156.78 ms
 99th Percentile:       125.45 ms
 ```
 
+### Multi-Scenario Benchmark Suite
+
+For comprehensive performance analysis, use the benchmark suite to test multiple configurations:
+
+```bash
+# Run full benchmark suite (all scenarios)
+./scripts/benchmark-suite.sh
+
+# Quick mode for faster results
+./scripts/benchmark-suite.sh -q
+
+# Run specific scenarios only
+./scripts/benchmark-suite.sh -s light,medium
+
+# Custom output directory
+./scripts/benchmark-suite.sh -o ./my-benchmark-results
+```
+
+#### Benchmark Suite Options
+
+```
+-o DIR          Output directory (default: benchmark-suite-results)
+-q              Quick mode (shorter test durations)
+-s SCENARIOS    Comma-separated scenario names to run (default: all)
+                Available: light, medium, heavy, stress
+-v              Verbose output
+-h              Show help message
+```
+
+#### Included Scenarios
+
+| Scenario | Clients | Messages | Rooms | Duration | Description |
+|----------|---------|----------|-------|----------|-------------|
+| **light** | 5 | 50 | 2 | 30s | Light load baseline |
+| **medium** | 10 | 100 | 3 | 60s | Moderate traffic |
+| **heavy** | 20 | 200 | 5 | 90s | Heavy concurrent load |
+| **stress** | 50 | 100 | 3 | 120s | Maximum capacity test |
+
+*Note: Quick mode (-q) reduces durations by 50% for faster iteration.*
+
+#### Suite Output
+
+The benchmark suite generates:
+
+- **suite-report.json**: Consolidated results from all scenarios
+- **suite-report.html**: Interactive comparison report with:
+  - Side-by-side scenario comparison table
+  - Detailed results for each scenario
+  - Performance trends and insights
+- **Individual results**: Separate JSON and HTML for each scenario
+
+Example suite output structure:
+```
+benchmark-suite-results/suite-20231208_143022/
+├── suite-report.json          # Consolidated data
+├── suite-report.html          # Visual comparison
+├── light.json                 # Light scenario results
+├── light.html                 # Light scenario report
+├── medium.json                # Medium scenario results
+├── medium.html                # Medium scenario report
+├── heavy.json                 # Heavy scenario results
+├── heavy.html                 # Heavy scenario report
+├── stress.json                # Stress scenario results
+└── stress.html                # Stress scenario report
+```
+
+#### Analyzing Suite Results
+
+The HTML report provides:
+
+1. **Quick Comparison Table**: Compare throughput, latency, and success rates across all scenarios
+2. **Trend Analysis**: Identify performance degradation under load
+3. **Bottleneck Detection**: Spot where the system starts to struggle
+4. **Capacity Planning**: Determine optimal load thresholds
+
+Open the suite report in your browser:
+```bash
+# After running the suite
+open benchmark-suite-results/suite-*/suite-report.html
+```
+
 ## Troubleshooting
 
 ### VMs won't start
