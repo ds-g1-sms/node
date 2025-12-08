@@ -80,6 +80,9 @@ vagrant destroy -f
 
 ## Troubleshooting
 
+**See WebSocket errors in logs?**
+Errors like "EOFError", "426 Upgrade Required", or "missing Connection header" are NORMAL. They're from Docker health checks hitting the WebSocket port. Ignore them - the server is working fine!
+
 **Connection refused on port 8081?**
 - Wait 30-60 seconds after deployment for services to start
 - Run: `./scripts/troubleshoot-connectivity.sh` for detailed diagnostics

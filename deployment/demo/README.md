@@ -321,6 +321,24 @@ vagrant ssh node1 -c "docker exec \$(docker ps -q -f name=node1) ping -c 3 node2
 vagrant ssh node1 -c "sudo iptables -L"
 ```
 
+### WebSocket errors in logs (EXPECTED - NOT A PROBLEM)
+
+You may see errors like these in the service logs:
+
+```
+websockets.server - ERROR - opening handshake failed
+EOFError: connection closed while reading HTTP request line
+websockets.exceptions.InvalidUpgrade: missing Connection header
+connection rejected (426 Upgrade Required)
+```
+
+**These are NORMAL and can be safely ignored.** They occur when:
+- Docker Swarm's ingress network does TCP health checks on published ports
+- Non-WebSocket clients (like curl or health probes) try to connect to WebSocket ports
+- Port scanners or load balancers probe the ports
+
+The WebSocket server is working correctly. These errors don't affect functionality - actual WebSocket clients with proper upgrade headers will connect successfully. You'll see "Node server ready" and "WebSocket server started" messages indicating everything is working.
+
 ### Can't connect from chat client
 
 **Common Issue**: Connection refused on port 8081/8082/8083
