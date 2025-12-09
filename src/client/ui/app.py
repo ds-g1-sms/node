@@ -681,6 +681,7 @@ class ChatApp(App):
         status = self.query_one("#create-room-status", Static)
 
         room_name = name_input.value.strip()
+        description = desc_input.value.strip() or None
 
         if not room_name:
             status.update("[red]Please enter a room name[/]")
@@ -689,7 +690,7 @@ class ChatApp(App):
         try:
             status.update("[yellow]Creating room...[/]")
 
-            await self.client.create_room(room_name, self.username)
+            await self.client.create_room(room_name, self.username, description)
 
             # Clear inputs
             name_input.value = ""

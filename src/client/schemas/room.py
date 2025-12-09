@@ -19,10 +19,12 @@ class CreateRoomRequest(BaseRequest):
     Attributes:
         room_name: Name of the room to create
         creator_id: ID of the user creating the room
+        description: Optional description for the room
     """
 
     room_name: str
     creator_id: str
+    description: Optional[str] = None
 
     @property
     def _message_type(self) -> str:

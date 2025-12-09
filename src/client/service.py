@@ -110,7 +110,7 @@ class ClientService:
         return self._connected and self.websocket is not None
 
     async def create_room(
-        self, room_name: str, creator_id: str
+        self, room_name: str, creator_id: str, description: Optional[str] = None
     ) -> RoomCreatedResponse:
         """
         Send a request to create a new room on the node.
@@ -118,6 +118,7 @@ class ClientService:
         Args:
             room_name: Name of the room to create
             creator_id: ID of the user creating the room
+            description: Optional description for the room
 
         Returns:
             RoomCreatedResponse with room details
@@ -142,7 +143,7 @@ class ClientService:
         from .protocol import CreateRoomRequest
 
         # Create and send request
-        request = CreateRoomRequest(room_name, creator_id)
+        request = CreateRoomRequest(room_name, creator_id, description)
         await self.websocket.send(request.to_json())
 
         # Receive response - loop until we get a room_created response
