@@ -422,6 +422,7 @@ class ChatApp(App):
         self.username: Optional[str] = None
         self.current_room_id: Optional[str] = None
         self.current_room_name: Optional[str] = None
+        self.current_room_description: Optional[str] = None
         self.current_room_creator: Optional[str] = None
         self.current_members: List[str] = []
         self._current_screen = "connection"
@@ -579,6 +580,7 @@ class ChatApp(App):
         self.username = None
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_members = []
 
         self._show_screen("connection")
@@ -717,6 +719,7 @@ class ChatApp(App):
 
             self.current_room_id = response.room_id
             self.current_room_name = response.room_name
+            self.current_room_description = response.description
             self.client.set_current_room(response.room_id)
             self.current_members = list(response.members)
 
@@ -763,6 +766,7 @@ class ChatApp(App):
 
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_room_creator = None
         self.current_members = []
 
@@ -799,8 +803,13 @@ class ChatApp(App):
         """Update the chat screen with current room info."""
         try:
             header = self.query_one("#room-header", Static)
+            description_part = (
+                f" | {self.current_room_description}"
+                if self.current_room_description
+                else ""
+            )
             header.update(
-                f"[bold]Room: {self.current_room_name}[/] "
+                f"[bold]Room: {self.current_room_name}[/]{description_part} "
                 f"| Members: {len(self.current_members)}"
             )
 
@@ -955,6 +964,7 @@ class ChatApp(App):
         # Clear room state
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_room_creator = None
         self.current_members = []
         self._deletion_in_progress = False
@@ -1026,6 +1036,7 @@ class ChatApp(App):
         # Clear room state first
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_room_creator = None
         self.current_members = []
         self._deletion_in_progress = False
