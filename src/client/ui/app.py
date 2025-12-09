@@ -15,8 +15,8 @@ from textual.binding import Binding
 from textual.containers import (
     Container,
     Horizontal,
-    Vertical,
     ScrollableContainer,
+    Vertical,
 )
 from textual.css.query import NoMatches
 from textual.widgets import (
@@ -619,7 +619,7 @@ class ChatApp(App):
 
             # Update table
             table.clear(columns=True)
-            table.add_columns("Name", "Description", "Members", "Admin Node")
+            table.add_columns("Name", "Description", "Members", "Host")
             table.cursor_type = "row"
 
             for room in rooms_data:
@@ -633,8 +633,7 @@ class ChatApp(App):
 
             if rooms_data:
                 status.update(
-                    f"[green]Found {len(rooms_data)} room(s). "
-                    f"Click a row to join.[/]"
+                    f"[green]Found {len(rooms_data)} room(s). Click a row to join.[/]"
                 )
             else:
                 status.update("[yellow]No rooms available. Create one![/]")
@@ -1018,8 +1017,7 @@ class ChatApp(App):
             status = self.query_one("#room-status", Static)
             reason_text = reason.lower() if reason else "unknown reason"
             status.update(
-                f"[red]You were removed from '{room_name}' "
-                f"due to {reason_text}.[/]"
+                f"[red]You were removed from '{room_name}' due to {reason_text}.[/]"
             )
         except NoMatches:
             pass
@@ -1075,8 +1073,7 @@ class ChatApp(App):
         try:
             message = self.query_one("#delete-room-message", Static)
             message.update(
-                f"Are you sure you want to delete "
-                f"[bold]'{self.current_room_name}'[/]?"
+                f"Are you sure you want to delete [bold]'{self.current_room_name}'[/]?"
             )
             status = self.query_one("#delete-room-status", Static)
             status.update("")
