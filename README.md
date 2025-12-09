@@ -8,17 +8,20 @@ This repository contains the implementation of a distributed chat node that part
 
 ## Architecture
 
-See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
+See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation and [docs/terms.md](docs/terms.md) for terminology reference.
 
 ### Key Features
 
-- **Distributed Architecture**: All nodes are equal peers
-- **Room Hosting**: Each node can host multiple chat rooms
-- **Administrator-Based Ordering**: Room creator acts as authority for message ordering
-- **XML-RPC Communication**: Simple server-to-server communication using Python's native XML-RPC
+- **Distributed Architecture**: All nodes are equal peers with no central authority
+- **Dynamic Room Management**: Create, join, and delete rooms across the network
+- **Global Room Discovery**: Find rooms hosted on any node in the network
+- **Administrator-Based Ordering**: Room creator assigns sequence numbers for message ordering
+- **XML-RPC Communication**: Server-to-server communication with message forwarding and broadcasting
 - **WebSocket Clients**: Real-time bidirectional client-server messaging
 - **Terminal UI**: Rich terminal-based user interface built with Textual
-- **Fault Tolerance**: Basic health checks and failure detection
+- **Two-Phase Commit**: Coordinated room deletion across distributed nodes
+- **Fault Tolerance**: Heartbeat monitoring, disconnect detection, and automatic member cleanup
+- **Modular Architecture**: Reusable schemas and utilities for maintainability
 
 ## Quick Start
 
@@ -82,21 +85,40 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 .
 ├── src/
 │   ├── node/           # Node server
-│   │   ├── main.py           # Node entry point
-│   │   ├── room_state.py     # Room management
-│   │   ├── websocket_server.py  # WebSocket server
-│   │   ├── xmlrpc_server.py  # XML-RPC server
-│   │   └── peer_registry.py  # Peer node registry
+│   │   ├── main.py              # Node entry point
+│   │   ├── room_state.py        # Room state management
+│   │   ├── websocket_server.py  # WebSocket server for clients
+│   │   ├── xmlrpc_server.py     # XML-RPC server for peer communication
+│   │   ├── peer_registry.py     # Peer node registry
+│   │   ├── schemas/             # Standardized data structures
+│   │   │   ├── messages.py      # Message schemas
+│   │   │   ├── events.py        # Event schemas
+│   │   │   └── responses.py     # Response schemas
+│   │   └── utils/               # Utility functions
+│   │       ├── broadcast.py     # Peer broadcasting
+│   │       └── validation.py    # Input validation
 │   └── client/         # Chat client
-│       ├── main.py           # Client entry point
-│       ├── chat_client.py    # WebSocket client with message ordering
-│       ├── service.py        # Client service layer
-│       ├── protocol.py       # Message protocols
-│       ├── message_buffer.py # Message ordering buffer
-│       └── ui/               # Terminal UI (Textual)
+│       ├── main.py              # Client entry point
+│       ├── chat_client.py       # WebSocket client with message ordering
+│       ├── service.py           # Client service layer
+│       ├── protocol.py          # Message protocols
+│       ├── message_buffer.py    # Message ordering buffer
+│       ├── schemas/             # Client data structures
+│       │   ├── base.py          # Base schemas
+│       │   ├── member.py        # Member schemas
+│       │   ├── message.py       # Message schemas
+│       │   └── room.py          # Room schemas
+│       └── ui/                  # Terminal UI (Textual)
+│           └── app.py           # Main UI application
 ├── tests/              # Test files
 ├── docs/               # Documentation
-├── deploy/             # Deployment configurations
+│   ├── architecture.md # System architecture
+│   └── terms.md        # Terminology reference
+├── deployment/         # Deployment configurations
+│   ├── docker-compose.dev.yml   # Development setup
+│   ├── docker-compose.prod.yml  # Production setup
+│   ├── docs/           # Deployment documentation
+│   └── scripts/        # Deployment scripts
 └── docker-compose.yml  # Docker Compose for multi-node setup
 ```
 
