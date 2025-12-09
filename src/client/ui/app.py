@@ -15,8 +15,8 @@ from textual.binding import Binding
 from textual.containers import (
     Container,
     Horizontal,
-    Vertical,
     ScrollableContainer,
+    Vertical,
 )
 from textual.css.query import NoMatches
 from textual.widgets import (
@@ -422,6 +422,7 @@ class ChatApp(App):
         self.username: Optional[str] = None
         self.current_room_id: Optional[str] = None
         self.current_room_name: Optional[str] = None
+        self.current_room_description: Optional[str] = None
         self.current_room_creator: Optional[str] = None
         self.current_members: List[str] = []
         self._current_screen = "connection"
@@ -579,6 +580,7 @@ class ChatApp(App):
         self.username = None
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_members = []
 
         self._show_screen("connection")
@@ -617,7 +619,7 @@ class ChatApp(App):
 
             # Update table
             table.clear(columns=True)
-            table.add_columns("Name", "Description", "Members", "Admin Node")
+            table.add_columns("Name", "Description", "Members", "Host")
             table.cursor_type = "row"
 
             for room in rooms_data:
@@ -631,8 +633,7 @@ class ChatApp(App):
 
             if rooms_data:
                 status.update(
-                    f"[green]Found {len(rooms_data)} room(s). "
-                    f"Click a row to join.[/]"
+                    f"[green]Found {len(rooms_data)} room(s). Click a row to join.[/]"
                 )
             else:
                 status.update("[yellow]No rooms available. Create one![/]")
@@ -679,6 +680,7 @@ class ChatApp(App):
         status = self.query_one("#create-room-status", Static)
 
         room_name = name_input.value.strip()
+        description = desc_input.value.strip() or None
 
         if not room_name:
             status.update("[red]Please enter a room name[/]")
@@ -687,7 +689,7 @@ class ChatApp(App):
         try:
             status.update("[yellow]Creating room...[/]")
 
-            await self.client.create_room(room_name, self.username)
+            await self.client.create_room(room_name, self.username, description)
 
             # Clear inputs
             name_input.value = ""
@@ -717,6 +719,7 @@ class ChatApp(App):
 
             self.current_room_id = response.room_id
             self.current_room_name = response.room_name
+            self.current_room_description = response.description
             self.client.set_current_room(response.room_id)
             self.current_members = list(response.members)
 
@@ -763,6 +766,7 @@ class ChatApp(App):
 
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_room_creator = None
         self.current_members = []
 
@@ -799,8 +803,13 @@ class ChatApp(App):
         """Update the chat screen with current room info."""
         try:
             header = self.query_one("#room-header", Static)
+            description_part = (
+                f" | {self.current_room_description}"
+                if self.current_room_description
+                else ""
+            )
             header.update(
-                f"[bold]Room: {self.current_room_name}[/] "
+                f"[bold]Room: {self.current_room_name}[/]{description_part} "
                 f"| Members: {len(self.current_members)}"
             )
 
@@ -955,6 +964,7 @@ class ChatApp(App):
         # Clear room state
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_room_creator = None
         self.current_members = []
         self._deletion_in_progress = False
@@ -1007,8 +1017,7 @@ class ChatApp(App):
             status = self.query_one("#room-status", Static)
             reason_text = reason.lower() if reason else "unknown reason"
             status.update(
-                f"[red]You were removed from '{room_name}' "
-                f"due to {reason_text}.[/]"
+                f"[red]You were removed from '{room_name}' due to {reason_text}.[/]"
             )
         except NoMatches:
             pass
@@ -1026,6 +1035,7 @@ class ChatApp(App):
         # Clear room state first
         self.current_room_id = None
         self.current_room_name = None
+        self.current_room_description = None
         self.current_room_creator = None
         self.current_members = []
         self._deletion_in_progress = False
@@ -1063,8 +1073,7 @@ class ChatApp(App):
         try:
             message = self.query_one("#delete-room-message", Static)
             message.update(
-                f"Are you sure you want to delete "
-                f"[bold]'{self.current_room_name}'[/]?"
+                f"Are you sure you want to delete [bold]'{self.current_room_name}'[/]?"
             )
             status = self.query_one("#delete-room-status", Static)
             status.update("")

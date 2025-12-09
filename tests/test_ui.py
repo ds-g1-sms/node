@@ -64,6 +64,7 @@ class TestChatAppInitialization:
         assert app.username is None
         assert app.current_room_id is None
         assert app.current_room_name is None
+        assert app.current_room_description is None
         assert app.current_members == []
         assert app._current_screen == "connection"
 
