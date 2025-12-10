@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ds-g1-sms/node)
+
 # Distributed Chat System - Node
 
 A distributed peer-to-peer chat system built with Python, XML-RPC, and WebSockets.
