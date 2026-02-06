@@ -251,9 +251,10 @@ features:
 
 ## Contributing
 
-This is a course project for distributed systems. See architecture documentation
-for design decisions and trade-offs.
+This is a course project for
+[Distributed Systems (CSM13001)](https://studies.helsinki.fi/courses/course-unit/otm-1b26b72f-19c4-424f-8524-e917b67a659d/CSM13001?cpId=hy-lv-76).
+See architecture documentation for design decisions and trade-offs.
 
 ## License
 
-[Specify license here]
+See [LICENSE](LICENSE) file for more detail.
