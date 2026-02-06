@@ -12,6 +12,12 @@ participates in a peer-to-peer messaging network. Each node can host chat rooms,
 handle client connections, and communicate with other nodes to provide a
 distributed chat service.
 
+## Screenshots
+
+![Available rooms list](assets/screenshots/ChatApp_2026-02-06T14_15_36_914376.svg)
+![Chatroom example from user Alice](assets/screenshots/ChatApp_2026-02-06T14_14_24_978167.svg)
+![Chatroom example from user Bob](assets/screenshots/ChatApp_2026-02-06T14_14_31_167331.svg)
+
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md) for detailed architecture
