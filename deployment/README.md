@@ -1,10 +1,12 @@
 # Deployment - Distributed Chat System
 
-This directory contains all deployment configurations, scripts, and documentation for the distributed chat system.
+This directory contains all deployment configurations, scripts, and
+documentation for the distributed chat system.
 
 ## 🚀 Try the Demo First!
 
-**New to the system?** Try our automated VM demo that sets up 3 virtual machines with full Swarm orchestration:
+**New to the system?** Try our automated VM demo that sets up 3 virtual machines
+with full Swarm orchestration:
 
 ```bash
 cd demo
@@ -12,9 +14,10 @@ vagrant up
 ./scripts/deploy-demo.sh
 ```
 
-See [demo/QUICKSTART.md](demo/QUICKSTART.md) for a 15-minute walkthrough, or [demo/README.md](demo/README.md) for full documentation.
+See [demo/QUICKSTART.md](demo/QUICKSTART.md) for a 15-minute walkthrough, or
+[demo/README.md](demo/README.md) for full documentation.
 
----
+______________________________________________________________________
 
 ## Quick Start
 
@@ -82,6 +85,7 @@ deployment/
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Complete deployment guide
+
   - Prerequisites and requirements
   - Machine setup instructions
   - Docker Swarm configuration
@@ -89,6 +93,7 @@ Comprehensive documentation is available in the `docs/` directory:
   - Verification procedures
 
 - **[OPERATIONS.md](docs/OPERATIONS.md)** - Day-to-day operations
+
   - Monitoring and health checks
   - Log management
   - Service management
@@ -97,6 +102,7 @@ Comprehensive documentation is available in the `docs/` directory:
   - Backup and recovery
 
 - **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Problem resolution
+
   - Common issues and solutions
   - Diagnostic procedures
   - Error message reference
@@ -105,29 +111,34 @@ Comprehensive documentation is available in the `docs/` directory:
 ## Key Features
 
 ### Multi-Host Deployment
+
 - Docker Swarm orchestration
 - Three nodes on separate machines
 - Overlay network for inter-node communication
 - Placement constraints ensure node distribution
 
 ### High Availability
+
 - Health checks with automatic restart
 - Rolling updates with zero downtime
 - Graceful shutdown handling
 - Fault tolerance and recovery
 
 ### Resource Management
+
 - CPU and memory limits
 - Resource reservations
 - Configurable constraints per service
 
 ### Monitoring and Observability
+
 - Health check endpoints
 - Service logs aggregation
 - Resource monitoring
 - Operational metrics
 
 ### Security
+
 - Non-root container users
 - Minimal base images
 - Secret management support
@@ -155,26 +166,27 @@ docker service logs -f chat-system_node1
 
 Key environment variables (see `.env.example` for complete list):
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `REGISTRY` | Container registry URL | `ghcr.io/ds-g1-sms` |
-| `VERSION` | Image version/tag | `latest` |
-| `NODE1_WS_PORT` | Node 1 WebSocket port | `8080` |
-| `NODE2_WS_PORT` | Node 2 WebSocket port | `8080` |
-| `NODE3_WS_PORT` | Node 3 WebSocket port | `8080` |
-| `LOG_LEVEL` | Logging level | `INFO` |
-| `CPU_LIMIT` | CPU limit per service | `1.0` |
-| `MEMORY_LIMIT` | Memory limit per service | `512M` |
+| Variable        | Description              | Default             |
+| --------------- | ------------------------ | ------------------- |
+| `REGISTRY`      | Container registry URL   | `ghcr.io/ds-g1-sms` |
+| `VERSION`       | Image version/tag        | `latest`            |
+| `NODE1_WS_PORT` | Node 1 WebSocket port    | `8080`              |
+| `NODE2_WS_PORT` | Node 2 WebSocket port    | `8080`              |
+| `NODE3_WS_PORT` | Node 3 WebSocket port    | `8080`              |
+| `LOG_LEVEL`     | Logging level            | `INFO`              |
+| `CPU_LIMIT`     | CPU limit per service    | `1.0`               |
+| `MEMORY_LIMIT`  | Memory limit per service | `512M`              |
 
 ## Port Mapping
 
-Since each node runs on a separate machine with a unique IP address, all nodes use the same ports:
+Since each node runs on a separate machine with a unique IP address, all nodes
+use the same ports:
 
-| Node | WebSocket (Client) | XML-RPC (Inter-node) |
-|------|-------------------|---------------------|
-| Node 1 | 8080 | 9090 |
-| Node 2 | 8080 | 9090 |
-| Node 3 | 8080 | 9090 |
+| Node   | WebSocket (Client) | XML-RPC (Inter-node) |
+| ------ | ------------------ | -------------------- |
+| Node 1 | 8080               | 9090                 |
+| Node 2 | 8080               | 9090                 |
+| Node 3 | 8080               | 9090                 |
 
 ## Network Architecture
 
@@ -197,17 +209,20 @@ Since each node runs on a separate machine with a unique IP address, all nodes u
 ## Prerequisites
 
 ### Hardware
+
 - 3 machines (physical or virtual)
 - 2+ CPU cores per machine
 - 4+ GB RAM per machine
 - 20+ GB disk per machine
 
 ### Software
+
 - Docker Engine 20.10+
 - Docker Compose 1.29+ (for local dev)
 - Linux OS (Ubuntu 20.04+ or CentOS 8+)
 
 ### Network
+
 - Open ports: 2377, 7946, 4789 (Swarm)
 - Open ports: 8080, 9090 (Application - same on each machine)
 - Network connectivity between all machines

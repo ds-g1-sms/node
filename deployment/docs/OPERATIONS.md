@@ -1,6 +1,7 @@
 # Operations Manual - Distributed Chat System
 
-This manual provides guidance for day-to-day operations of the distributed chat system.
+This manual provides guidance for day-to-day operations of the distributed chat
+system.
 
 ## Table of Contents
 
@@ -16,7 +17,9 @@ This manual provides guidance for day-to-day operations of the distributed chat 
 
 ## Overview
 
-The distributed chat system consists of three independent node services orchestrated by Docker Swarm. This manual covers common operational tasks and procedures.
+The distributed chat system consists of three independent node services
+orchestrated by Docker Swarm. This manual covers common operational tasks and
+procedures.
 
 ### Key Operational Principles
 
@@ -433,22 +436,26 @@ docker network inspect chat-system_chat-overlay \
 ### Service Down
 
 1. **Check service status**:
+
 ```bash
 docker service ps chat-system_node1
 ```
 
 2. **View logs for errors**:
+
 ```bash
 ./scripts/logs.sh -n node1 -t 100
 ```
 
 3. **Check node health**:
+
 ```bash
 docker node ls
 docker node inspect <NODE-NAME>
 ```
 
 4. **Restart service if needed**:
+
 ```bash
 docker service update --force chat-system_node1
 ```
@@ -456,16 +463,19 @@ docker service update --force chat-system_node1
 ### High Resource Usage
 
 1. **Check resource consumption**:
+
 ```bash
 docker stats --no-stream
 ```
 
 2. **Identify problematic container**:
+
 ```bash
 docker stats $(docker ps -q -f name=node)
 ```
 
 3. **Review recent logs**:
+
 ```bash
 ./scripts/logs.sh -n node1 -t 200
 ```
@@ -473,6 +483,7 @@ docker stats $(docker ps -q -f name=node)
 ### Network Issues
 
 1. **Test connectivity**:
+
 ```bash
 # Between nodes
 docker exec $(docker ps -q -f name=node1) ping node2
@@ -482,11 +493,13 @@ docker exec $(docker ps -q -f name=node1) ping 8.8.8.8
 ```
 
 2. **Check overlay network**:
+
 ```bash
 docker network inspect chat-system_chat-overlay
 ```
 
 3. **Restart network if needed**:
+
 ```bash
 # Restart affected services
 docker service update --force chat-system_node1
@@ -501,18 +514,21 @@ Schedule maintenance during low-traffic periods:
 1. **Notify users** of upcoming maintenance
 
 2. **Verify backups** are current:
+
 ```bash
 # Run backup
 ./scripts/backup.sh  # if created
 ```
 
 3. **Perform maintenance** (e.g., updates):
+
 ```bash
 # Update services one at a time
 ./scripts/deploy.sh -e deployment/.env.prod -b
 ```
 
 4. **Verify system** post-maintenance:
+
 ```bash
 ./scripts/health-check.sh -v
 ```
@@ -528,6 +544,7 @@ For urgent issues:
 2. **Isolate issue** - Identify affected services
 
 3. **Take corrective action**:
+
 ```bash
 # Quick fixes
 docker service update --force chat-system_node1
@@ -582,6 +599,7 @@ docker stack rm chat-system
 ## Support
 
 For assistance:
+
 - Review logs: `./scripts/logs.sh -f`
 - Run health checks: `./scripts/health-check.sh -v`
 - Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)

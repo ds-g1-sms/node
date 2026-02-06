@@ -1,10 +1,14 @@
 # Client Service Module
 
-This module provides the client-side functionality for the distributed chat system, including the terminal user interface.
+This module provides the client-side functionality for the distributed chat
+system, including the terminal user interface.
 
 ## Overview
 
-The client service enables applications to connect to node servers via WebSocket and perform operations such as creating rooms, joining rooms, and sending messages. It includes a terminal-based user interface built with the Textual framework.
+The client service enables applications to connect to node servers via WebSocket
+and perform operations such as creating rooms, joining rooms, and sending
+messages. It includes a terminal-based user interface built with the Textual
+framework.
 
 ## Quick Start
 
@@ -19,6 +23,7 @@ poetry run python -m src.client.main
 ```
 
 This launches the terminal-based chat interface where you can:
+
 1. Enter your username and node address
 2. Connect to a node
 3. Discover and browse available rooms
@@ -40,6 +45,7 @@ This launches the terminal-based chat interface where you can:
 Terminal-based UI built with the Textual framework.
 
 **Main Components:**
+
 - `ChatApp` - Main application class
 - `ConnectionScreen` - Connect to a node
 - `RoomListScreen` - View and manage rooms
@@ -47,6 +53,7 @@ Terminal-based UI built with the Textual framework.
 - `ChatScreen` - Chat interface with message display
 
 **Features:**
+
 - Connection management with status feedback
 - Room discovery (local and global)
 - Room creation with name and description
@@ -60,12 +67,14 @@ Terminal-based UI built with the Textual framework.
 The main service class that handles all client-server interactions.
 
 **Key Features:**
+
 - WebSocket connection management
 - Asynchronous communication
 - Dependency injection support for testing
 - Message handler registration
 
 **Entry Points:**
+
 - `connect()` - Establish connection to a node
 - `disconnect()` - Close connection
 - `create_room(room_name, creator_id)` - Create a new chat room
@@ -78,6 +87,7 @@ The main service class that handles all client-server interactions.
 Extended client with message ordering capabilities.
 
 **Features:**
+
 - Per-room message buffers
 - Ordered message delivery
 - Duplicate detection
@@ -88,6 +98,7 @@ Extended client with message ordering capabilities.
 Message classes for client-server communication.
 
 **Implemented Messages:**
+
 - `CreateRoomRequest` / `RoomCreatedResponse`
 - `ListRoomsRequest` / `RoomsListResponse`
 - `JoinRoomRequest` / `JoinRoomSuccessResponse` / `JoinRoomErrorResponse`
@@ -96,8 +107,8 @@ Message classes for client-server communication.
 - `MemberJoinedNotification`
 - `MessageErrorResponse`
 
-**Message Format:**
-All messages use JSON with the following structure:
+**Message Format:** All messages use JSON with the following structure:
+
 ```json
 {
   "type": "message_type",
@@ -110,6 +121,7 @@ All messages use JSON with the following structure:
 Client-side message ordering buffer.
 
 **Features:**
+
 - Binary search insertion (O(log n))
 - Sequential message retrieval
 - Gap detection
@@ -192,11 +204,13 @@ asyncio.run(main())
 Tests are located in `tests/test_*.py`.
 
 Run all tests:
+
 ```bash
 poetry run pytest -v
 ```
 
 Run UI-specific tests:
+
 ```bash
 poetry run pytest tests/test_ui.py -v
 ```
@@ -205,7 +219,8 @@ poetry run pytest tests/test_ui.py -v
 
 ### Dependency Injection
 
-The `ClientService` supports dependency injection for the WebSocket connection factory, making it testable:
+The `ClientService` supports dependency injection for the WebSocket connection
+factory, making it testable:
 
 ```python
 # Custom WebSocket factory for testing
@@ -221,6 +236,7 @@ service = ClientService(
 ### Async/Await Pattern
 
 All I/O operations use async/await for non-blocking execution:
+
 - Better performance with concurrent operations
 - Natural fit for WebSocket communication
 - Compatible with Textual's async nature
@@ -230,12 +246,14 @@ All I/O operations use async/await for non-blocking execution:
 ### With Node Server
 
 The client service expects the node server to:
+
 1. Accept WebSocket connections at `/ws` endpoint
 2. Handle JSON-formatted messages
 3. Respond with appropriate message types
 4. Broadcast messages to room members
 
 **Protocol Contract:**
+
 - Client sends requests with `type` field
 - Server responds with corresponding response types
 - Real-time notifications for new messages and member joins
@@ -243,6 +261,7 @@ The client service expects the node server to:
 ## Development Status
 
 ### ✅ Completed
+
 - [x] Client service module structure
 - [x] WebSocket connection/disconnection
 - [x] Protocol message classes
@@ -260,6 +279,7 @@ The client service expects the node server to:
 - [x] Documentation
 
 ### 🚧 Future Enhancements
+
 - [ ] Multiple simultaneous room participation
 - [ ] Private messaging
 - [ ] User profiles

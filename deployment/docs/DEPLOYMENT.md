@@ -1,6 +1,7 @@
 # Deployment Guide - Distributed Chat System
 
-This guide provides comprehensive instructions for deploying the distributed chat system in production using Docker Swarm across multiple machines.
+This guide provides comprehensive instructions for deploying the distributed
+chat system in production using Docker Swarm across multiple machines.
 
 ## Table of Contents
 
@@ -18,9 +19,11 @@ This guide provides comprehensive instructions for deploying the distributed cha
 
 ## Overview
 
-The production deployment uses Docker Swarm to orchestrate three chat node services across three separate machines, providing:
+The production deployment uses Docker Swarm to orchestrate three chat node
+services across three separate machines, providing:
 
-- **Multi-host deployment**: Each node runs on a dedicated physical or virtual machine
+- **Multi-host deployment**: Each node runs on a dedicated physical or virtual
+  machine
 - **Service discovery**: Nodes automatically discover peers via overlay network
 - **Health monitoring**: Automatic health checks and restart on failure
 - **Rolling updates**: Zero-downtime deployments
@@ -52,11 +55,13 @@ On each machine:
 Each machine must have the following ports accessible:
 
 **Docker Swarm Ports:**
+
 - `2377/tcp` - Cluster management
 - `7946/tcp` and `7946/udp` - Node communication
 - `4789/udp` - Overlay network traffic
 
 **Application Ports (per node):**
+
 - `8081/tcp` - Node 1 WebSocket (client connections)
 - `9091/tcp` - Node 1 XML-RPC (inter-node communication)
 - `8082/tcp` - Node 2 WebSocket
@@ -102,7 +107,8 @@ The deployment uses Docker Swarm placement constraints to ensure:
 
 ### 1. Provision Machines
 
-Provision three machines with the required specifications. For this guide, we'll use:
+Provision three machines with the required specifications. For this guide, we'll
+use:
 
 - **Machine 1**: `192.168.1.10` (will be Swarm manager)
 - **Machine 2**: `192.168.1.11` (worker)
@@ -546,6 +552,7 @@ For more troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 ## Support
 
 For issues or questions:
+
 - Check the [Troubleshooting Guide](TROUBLESHOOTING.md)
 - Review logs: `./scripts/logs.sh -f`
 - Contact: ds-g1-sms team

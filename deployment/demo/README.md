@@ -1,10 +1,14 @@
 # Multi-VM Demo for Distributed Chat System
 
-This directory contains a complete demo environment that creates three virtual machines to demonstrate the production deployment of the distributed chat system using Docker Swarm.
+This directory contains a complete demo environment that creates three virtual
+machines to demonstrate the production deployment of the distributed chat system
+using Docker Swarm.
 
 ## Overview
 
-The demo automatically provisions three Ubuntu VMs using Vagrant and VirtualBox, sets up Docker Swarm across them, and deploys the chat system in a truly distributed manner - exactly as it would be deployed in production.
+The demo automatically provisions three Ubuntu VMs using Vagrant and VirtualBox,
+sets up Docker Swarm across them, and deploys the chat system in a truly
+distributed manner - exactly as it would be deployed in production.
 
 ## Prerequisites
 
@@ -13,14 +17,17 @@ Before running the demo, you need the following installed on your host machine:
 ### Required Software
 
 1. **VirtualBox** (6.1 or later)
+
    - Download: https://www.virtualbox.org/wiki/Downloads
    - Used to run the virtual machines
 
 2. **Vagrant** (2.3 or later)
+
    - Download: https://www.vagrantup.com/downloads
    - Used to manage and provision VMs
 
 3. **Docker** (optional, for building images locally)
+
    - Download: https://www.docker.com/get-started
    - If not available, images will be built on the VMs
 
@@ -42,6 +49,7 @@ vagrant up
 ```
 
 This will:
+
 - Download the Ubuntu 22.04 base box (first time only)
 - Create three VMs: `node1`, `node2`, `node3`
 - Install Docker on each VM
@@ -60,6 +68,7 @@ vagrant status
 ```
 
 Expected output:
+
 ```
 node1                     running (virtualbox)
 node2                     running (virtualbox)
@@ -87,6 +96,7 @@ vagrant ssh node1 -c "bash /vagrant/scripts/setup-swarm.sh"
 ```
 
 This script will:
+
 - Build the Docker image
 - Transfer it to all VMs
 - Create demo configuration
@@ -133,19 +143,21 @@ Connect using the chat client:
 poetry run chat-client
 ```
 
-Then connect to any of the nodes using their IP:port (e.g., `ws://192.168.56.101:8080`)
+Then connect to any of the nodes using their IP:port (e.g.,
+`ws://192.168.56.101:8080`)
 
 ## VM Network Configuration
 
 The demo creates a private network with the following configuration:
 
-| VM | Hostname | IP Address | WebSocket Port | XML-RPC Port |
-|----|----------|------------|----------------|--------------|
-| node1 | chat-node1 | 192.168.56.101 | 8080 | 9090 |
-| node2 | chat-node2 | 192.168.56.102 | 8080 | 9090 |
-| node3 | chat-node3 | 192.168.56.103 | 8080 | 9090 |
+| VM    | Hostname   | IP Address     | WebSocket Port | XML-RPC Port |
+| ----- | ---------- | -------------- | -------------- | ------------ |
+| node1 | chat-node1 | 192.168.56.101 | 8080           | 9090         |
+| node2 | chat-node2 | 192.168.56.102 | 8080           | 9090         |
+| node3 | chat-node3 | 192.168.56.103 | 8080           | 9090         |
 
-Since each node runs on a different machine with a unique IP address, they all use the same ports (8080 for WebSocket, 9090 for XML-RPC) without conflicts.
+Since each node runs on a different machine with a unique IP address, they all
+use the same ports (8080 for WebSocket, 9090 for XML-RPC) without conflicts.
 
 ## Useful Commands
 
@@ -247,7 +259,8 @@ Host Machine (your computer)
 
 ## Performance Benchmarking
 
-The demo includes a comprehensive load testing script to measure system performance:
+The demo includes a comprehensive load testing script to measure system
+performance:
 
 ### Running the Benchmark
 
@@ -308,7 +321,8 @@ Max:                   156.78 ms
 
 ### Multi-Scenario Benchmark Suite
 
-For comprehensive performance analysis, use the benchmark suite to test multiple configurations:
+For comprehensive performance analysis, use the benchmark suite to test multiple
+configurations:
 
 ```bash
 # Run full benchmark suite (all scenarios)
@@ -337,12 +351,12 @@ For comprehensive performance analysis, use the benchmark suite to test multiple
 
 #### Included Scenarios
 
-| Scenario | Clients | Messages | Rooms | Duration | Description |
-|----------|---------|----------|-------|----------|-------------|
-| **light** | 5 | 50 | 2 | 30s | Light load baseline |
-| **medium** | 10 | 100 | 3 | 60s | Moderate traffic |
-| **heavy** | 20 | 200 | 5 | 90s | Heavy concurrent load |
-| **stress** | 50 | 100 | 3 | 120s | Maximum capacity test |
+| Scenario   | Clients | Messages | Rooms | Duration | Description           |
+| ---------- | ------- | -------- | ----- | -------- | --------------------- |
+| **light**  | 5       | 50       | 2     | 30s      | Light load baseline   |
+| **medium** | 10      | 100      | 3     | 60s      | Moderate traffic      |
+| **heavy**  | 20      | 200      | 5     | 90s      | Heavy concurrent load |
+| **stress** | 50      | 100      | 3     | 120s     | Maximum capacity test |
 
 *Note: Quick mode (-q) reduces durations by 50% for faster iteration.*
 
@@ -358,6 +372,7 @@ The benchmark suite generates:
 - **Individual results**: Separate JSON and HTML for each scenario
 
 Example suite output structure:
+
 ```
 benchmark-suite-results/suite-20231208_143022/
 ├── suite-report.json          # Consolidated data
@@ -376,12 +391,14 @@ benchmark-suite-results/suite-20231208_143022/
 
 The HTML report provides:
 
-1. **Quick Comparison Table**: Compare throughput, latency, and success rates across all scenarios
+1. **Quick Comparison Table**: Compare throughput, latency, and success rates
+   across all scenarios
 2. **Trend Analysis**: Identify performance degradation under load
 3. **Bottleneck Detection**: Spot where the system starts to struggle
 4. **Capacity Planning**: Determine optimal load thresholds
 
 Open the suite report in your browser:
+
 ```bash
 # After running the suite
 open benchmark-suite-results/suite-*/suite-report.html
@@ -414,17 +431,20 @@ vagrant ssh node1 -c "docker swarm init --advertise-addr 192.168.56.101"
 
 **Error: "No such image: chat-node:demo"**
 
-This means the Docker image wasn't properly distributed to all nodes in the Swarm.
+This means the Docker image wasn't properly distributed to all nodes in the
+Swarm.
 
 **Solution:**
 
 1. Remove the failed stack:
+
    ```bash
    vagrant ssh node1 -c "docker stack rm chat-demo"
    sleep 10
    ```
 
 2. Verify images are missing:
+
    ```bash
    for node in node1 node2 node3; do
      echo "=== $node ==="
@@ -433,11 +453,13 @@ This means the Docker image wasn't properly distributed to all nodes in the Swar
    ```
 
 3. Re-run the deployment script (it will rebuild and distribute the image):
+
    ```bash
    ./scripts/deploy-demo.sh
    ```
 
-**Prevention:** The deployment script now automatically verifies images on all nodes before deployment.
+**Prevention:** The deployment script now automatically verifies images on all
+nodes before deployment.
 
 **Other service issues:**
 
@@ -477,39 +499,52 @@ connection rejected (426 Upgrade Required)
 ```
 
 **These are NORMAL and can be safely ignored.** They occur when:
+
 - Docker Swarm's ingress network does TCP health checks on published ports
-- Non-WebSocket clients (like curl or health probes) try to connect to WebSocket ports
+- Non-WebSocket clients (like curl or health probes) try to connect to WebSocket
+  ports
 - Port scanners or load balancers probe the ports
 
-The WebSocket server is working correctly. These errors don't affect functionality - actual WebSocket clients with proper upgrade headers will connect successfully. You'll see "Node server ready" and "WebSocket server started" messages indicating everything is working.
+The WebSocket server is working correctly. These errors don't affect
+functionality - actual WebSocket clients with proper upgrade headers will
+connect successfully. You'll see "Node server ready" and "WebSocket server
+started" messages indicating everything is working.
 
 ### Can't connect from chat client
 
 **Common Issue**: Connection refused on port 8080
 
-This usually happens if services are still starting up. Docker Swarm services can take 30-60 seconds to fully initialize.
+This usually happens if services are still starting up. Docker Swarm services
+can take 30-60 seconds to fully initialize.
 
 **Solutions**:
 
 1. **Wait for services to be ready**:
+
    ```bash
    vagrant ssh node1 -c "docker stack ps chat-demo"
    ```
+
    All services should show "Running" state.
 
 2. **Check service logs**:
+
    ```bash
    vagrant ssh node1 -c "docker service logs chat-demo_node1"
    ```
+
    Look for "WebSocket server started" or similar messages.
 
 3. **Test from inside a VM**:
+
    ```bash
    vagrant ssh node1 -c "curl -v http://localhost:8080"
    ```
+
    If this works but external access doesn't, it's a networking issue.
 
 4. **Check if containers are running**:
+
    ```bash
    vagrant ssh node1 -c "docker ps"
    vagrant ssh node2 -c "docker ps"
@@ -517,15 +552,17 @@ This usually happens if services are still starting up. Docker Swarm services ca
    ```
 
 5. **Verify port publishing**:
+
    ```bash
    vagrant ssh node1 -c "docker service inspect chat-demo_node1 --format '{{json .Endpoint.Ports}}'"
    ```
 
 6. **Connect to the correct node IP**:
+
    - Node 1: ws://192.168.56.101:8080
    - Node 2: ws://192.168.56.102:8080
    - Node 3: ws://192.168.56.103:8080
-   
+
    Each node is accessible on its own IP at port 8080.
 
 ## Customization
